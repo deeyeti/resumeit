@@ -55,8 +55,6 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: '.'          # Deploy entire project root
-          # Exclude the SRS PDF from the public deployment
-          exclude: '*.pdf'
 
       - name: Deploy to GitHub Pages
         id: deployment
