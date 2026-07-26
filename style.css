@@ -23,6 +23,8 @@
   --accent-hover:   #5C3A1E;
   --accent-subtle:  #EDE0CC;
   --accent-mid:     #B8845A;
+  --status-success: #2E7D4F;
+  --status-warning: #A96400;
 
   --border:       #E0D5C5;
   --border-strong:#C4B09A;
@@ -87,6 +89,8 @@
   --accent-hover:   #D4A87A;
   --accent-subtle:  #2A1E12;
   --accent-mid:     #9A7050;
+  --status-success: #6BBF8E;
+  --status-warning: #D4A060;
 
   --border:       #2A231C;
   --border-strong:#3D3226;
@@ -964,6 +968,19 @@ code, pre, .mono {
   border: 1px solid var(--border);
   max-height: 200px;
   overflow-y: auto;
+}
+
+.gen-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
 }
 
 .gen-log-line {

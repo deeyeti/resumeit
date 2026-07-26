@@ -54,10 +54,18 @@ function showToast(message, type = 'info', duration = 4000) {
 
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
-  toast.innerHTML = `
-    <span class="toast-msg">${message}</span>
-    <button class="toast-close" onclick="this.parentElement.remove()" type="button">✕</button>
-  `;
+  const messageEl = document.createElement('span');
+  messageEl.className = 'toast-msg';
+  messageEl.textContent = message;
+
+  const closeButton = document.createElement('button');
+  closeButton.className = 'toast-close';
+  closeButton.type = 'button';
+  closeButton.setAttribute('aria-label', 'Dismiss notification');
+  closeButton.textContent = '✕';
+  closeButton.addEventListener('click', () => toast.remove());
+
+  toast.append(messageEl, closeButton);
 
   container.appendChild(toast);
   setTimeout(() => toast.remove(), duration);
@@ -181,11 +189,19 @@ async function onboardingNext() {
   }
 
   if (onboardingStep === 2) {
+    const pendingUpload = state._pendingUploadFile;
+
     // Final step - finish onboarding
     ls.set('onboarded', true);
     hideOnboarding();
     await refreshData();
     navigate('dashboard');
+
+    if (pendingUpload) {
+      await handleResumeUpload(pendingUpload);
+      delete state._pendingUploadFile;
+    }
+
     showToast('Welcome to ResumeIt! 🎉', 'success');
     return;
   }
@@ -265,7 +281,7 @@ function renderVault() {
         <div class="vault-entry-context">
           ${entry.context ? `<span>${escHtml(entry.context)}</span>` : ''}
           ${entry.dateRange ? `<span style="color:var(--text-muted)">${escHtml(entry.dateRange)}</span>` : ''}
-          ${entry.type ? `<span class="tag" style="font-size:10px;">${entry.type}</span>` : ''}
+          ${entry.type ? `<span class="tag" style="font-size:10px;">${escHtml(entry.type)}</span>` : ''}
         </div>
         ${entry.bulletPoints?.length ? `
           <div class="vault-entry-bullets">
@@ -472,10 +488,12 @@ function initGenerator() {
   if (progressBar) progressBar.style.width = '0%';
 
   // Reset step wizard
-  document.querySelectorAll('.step-item').forEach((el, i) => {
+  document.querySelectorAll('.step-nav-item').forEach((el, i) => {
     el.classList.remove('active', 'done');
     if (i === 0) el.classList.add('active');
   });
+
+  renderGeneratorVaultSummary();
 }
 
 function showGeneratorStep(step) {
@@ -506,7 +524,7 @@ function showGeneratorStep(step) {
   }
 
   // Update wizard step indicators
-  document.querySelectorAll('.step-item').forEach((el, i) => {
+  document.querySelectorAll('.step-nav-item').forEach((el, i) => {
     el.classList.remove('active', 'done');
     if (i === step) el.classList.add('active');
     else if (i < step) el.classList.add('done');
@@ -514,6 +532,30 @@ function showGeneratorStep(step) {
 
   const progress = Math.round((step / 4) * 100);
   document.getElementById('gen-progress-bar').style.width = `${progress}%`;
+}
+
+function renderGeneratorVaultSummary() {
+  const badge = document.getElementById('vault-count-badge');
+  const container = document.getElementById('vault-summary-list');
+  if (!badge || !container) return;
+
+  const count = state.vaultEntries.length;
+  badge.textContent = `${count} ${count === 1 ? 'entry' : 'entries'}`;
+
+  if (count === 0) {
+    container.innerHTML = '<p style="font-size:var(--text-xs);color:var(--text-muted);">Add entries to give the AI material to tailor.</p>';
+    return;
+  }
+
+  const entries = state.vaultEntries.slice(0, 5);
+  const extraCount = count - entries.length;
+  container.innerHTML = entries.map(entry => `
+    <div style="font-size:var(--text-xs);color:var(--text-secondary);padding:5px 0;border-bottom:1px solid var(--divider);">
+      <strong>${escHtml(entry.title)}</strong>${entry.context ? ` <span style="color:var(--text-muted);">· ${escHtml(entry.context)}</span>` : ''}
+    </div>
+  `).join('') + (extraCount > 0
+    ? `<div style="font-size:var(--text-xs);color:var(--text-muted);padding-top:6px;">+${extraCount} more</div>`
+    : '');
 }
 
 async function startGeneration() {
@@ -537,7 +579,6 @@ async function startGeneration() {
 
   showGeneratorStep(1);
 
-  const statusEl = document.getElementById('gen-status');
   const statusIcon = document.getElementById('gen-status-icon');
   const statusText = document.getElementById('gen-status-text');
 
@@ -657,13 +698,13 @@ function renderRankedEntries(entries) {
   if (!container) return;
 
   container.innerHTML = entries.map(e => `
-    <div class="d-flex gap-12 items-center" style="padding:8px 0; border-bottom:1px solid var(--border-subtle);">
+    <div class="flex gap-12 items-center" style="padding:8px 0; border-bottom:1px solid var(--divider);">
       <div style="flex:1;">
         <div style="font-size:0.82rem;font-weight:600;">${escHtml(e.title)}</div>
         <div style="font-size:0.75rem;color:var(--text-muted);">${escHtml(e.context || '')}</div>
       </div>
       <div style="text-align:right;flex-shrink:0;">
-        <div style="font-size:0.9rem;font-weight:700;color:${e.relevanceScore >= 70 ? 'var(--accent-emerald)' : e.relevanceScore >= 40 ? 'var(--accent-amber)' : 'var(--text-muted)'};">${e.relevanceScore}%</div>
+        <div style="font-size:0.9rem;font-weight:700;color:${e.relevanceScore >= 70 ? 'var(--status-success)' : e.relevanceScore >= 40 ? 'var(--status-warning)' : 'var(--text-muted)'};">${e.relevanceScore}%</div>
         <div style="font-size:0.68rem;color:var(--text-muted);">relevance</div>
       </div>
     </div>
@@ -749,8 +790,9 @@ async function viewSavedResume(id) {
   const resume = state.savedResumes.find(r => r.id === id);
   if (!resume) return;
 
-  generatorState.generatedResume = resume.resumeData;
   navigate('generate');
+  generatorState.generatedResume = resume.resumeData;
+  generatorState.jd = resume.jd || '';
   showGeneratorStep(4);
   setTimeout(() => renderResumeResult(resume.resumeData), 100);
 }

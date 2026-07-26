@@ -31,10 +31,11 @@ jobs:
       - name: Inject version into app
         run: |
           VERSION=$(git describe --tags --always --abbrev=7 2>/dev/null || echo "dev")
+          DISPLAY_VERSION="${VERSION#v}"
           DEPLOY_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           echo "Injecting version: $VERSION at $DEPLOY_TIME"
           # Replace version placeholder in index.html if present
-          sed -i "s/v1\.1 · Open Source/v${VERSION}/g" index.html || true
+          sed -i "s/v1\.1 · Open Source/v${DISPLAY_VERSION} · Open Source/g" index.html || true
           # Write a version.json file for the auto-update checker
           cat > version.json << EOF
           {

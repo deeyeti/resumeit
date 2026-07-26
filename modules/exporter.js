@@ -8,7 +8,14 @@
  * Convert resume JSON data to clean ATS HTML string
  */
 export function resumeToHTML(data) {
-  const s = (str) => str ? String(str).replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+  const s = (value) => value === null || value === undefined
+    ? ''
+    : String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
 
   const skillsSection = data.skills
     ? `<h2>Technical Skills</h2>
