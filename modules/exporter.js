@@ -4,152 +4,38 @@
  * Produces ATS-compliant, single-column PDF output.
  */
 
-function shouldIncludeSection(options, section) {
-  return options?.sections?.[section] !== false;
-}
+import { getTemplate, normalizeTemplateOptions, SAMPLE_RESUME } from './templates/index.js';
 
 function getPageLimit(options) {
   return Number(options?.pageCount) === 2 ? 2 : 1;
+}
+
+export function resolveRenderOptions(options = {}) {
+  const template = getTemplate(options.templateId);
+  return {
+    ...options,
+    ...normalizeTemplateOptions(options),
+    templateId: template.id,
+    sections: options.sections || {},
+  };
 }
 
 /**
  * Convert resume JSON data to clean ATS HTML string
  */
 export function resumeToHTML(data, options = {}) {
-  const s = (value) => value === null || value === undefined
-    ? ''
-    : String(value)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-
-  const skillsSection = shouldIncludeSection(options, 'skills') && data.skills
-    ? `<h2>Technical Skills</h2>
-       ${data.skills.languages?.length ? `<p><strong>Languages:</strong> ${data.skills.languages.map(s).join(', ')}</p>` : ''}
-       ${data.skills.frameworks?.length ? `<p><strong>Frameworks:</strong> ${data.skills.frameworks.map(s).join(', ')}</p>` : ''}
-       ${data.skills.tools?.length ? `<p><strong>Tools & Platforms:</strong> ${data.skills.tools.map(s).join(', ')}</p>` : ''}
-       ${data.skills.other?.length ? `<p><strong>Other:</strong> ${data.skills.other.map(s).join(', ')}</p>` : ''}`
-    : '';
-
-  const experienceSection = shouldIncludeSection(options, 'experience') && data.experience?.length
-    ? `<h2>Experience</h2>
-       ${data.experience.map(exp => `
-         <div class="entry">
-           <div class="entry-header">
-             <div><strong>${s(exp.title)}</strong> — ${s(exp.company)}</div>
-             <div class="date">${s(exp.dateRange)}${exp.location ? ` · ${s(exp.location)}` : ''}</div>
-           </div>
-           <ul>${(exp.bullets || []).map(b => `<li>${s(b)}</li>`).join('')}</ul>
-         </div>`).join('')}`
-    : '';
-
-  const projectsSection = shouldIncludeSection(options, 'projects') && data.projects?.length
-    ? `<h2>Projects</h2>
-       ${data.projects.map(proj => `
-         <div class="entry">
-           <div class="entry-header">
-             <div><strong>${s(proj.name)}</strong>${proj.techStack?.length ? ` <span class="tech">| ${proj.techStack.map(s).join(', ')}</span>` : ''}${proj.url ? ` — <a href="https://${s(proj.url)}">${s(proj.url)}</a>` : ''}</div>
-           </div>
-           ${proj.description ? `<p class="proj-desc">${s(proj.description)}</p>` : ''}
-           <ul>${(proj.bullets || []).map(b => `<li>${s(b)}</li>`).join('')}</ul>
-         </div>`).join('')}`
-    : '';
-
-  const educationSection = shouldIncludeSection(options, 'education') && data.education?.length
-    ? `<h2>Education</h2>
-       ${data.education.map(edu => `
-         <div class="entry">
-           <div class="entry-header">
-             <div><strong>${s(edu.degree)}</strong> — ${s(edu.institution)}</div>
-             <div class="date">${s(edu.year)}${edu.gpa ? ` · GPA: ${s(edu.gpa)}` : ''}</div>
-           </div>
-         </div>`).join('')}`
-    : '';
-
-  const certsSection = shouldIncludeSection(options, 'certifications') && data.certifications?.length
-    ? `<h2>Certifications</h2>
-       <ul>${data.certifications.map(c => `<li>${s(typeof c === 'string' ? c : c.name)}</li>`).join('')}</ul>`
-    : '';
-
+  const resolvedOptions = resolveRenderOptions(options);
+  const template = getTemplate(resolvedOptions.templateId);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Arial', sans-serif;
-    font-size: 11pt;
-    color: #111;
-    line-height: 1.45;
-    background: #fff;
-    padding: 40px 48px;
-    max-width: 800px;
-    margin: 0 auto;
-  }
-  .header { margin-bottom: 16px; }
-  .name { font-size: 22pt; font-weight: 700; letter-spacing: -0.02em; }
-  .tagline { font-size: 11pt; color: #555; margin: 2px 0 8px; }
-  .contact {
-    font-size: 9.5pt;
-    color: #666;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  .contact a { color: #6c63ff; text-decoration: none; }
-  hr { border: none; border-top: 1.5px solid #222; margin: 10px 0 14px; }
-  h2 {
-    font-size: 10pt;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #444;
-    margin-bottom: 8px;
-    border-bottom: 1px solid #ddd;
-    padding-bottom: 3px;
-  }
-  .summary { font-size: 10.5pt; color: #333; margin-bottom: 14px; line-height: 1.55; }
-  .entry { margin-bottom: 12px; }
-  .entry-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 4px;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-  .date { font-size: 9.5pt; color: #666; white-space: nowrap; }
-  .tech { color: #888; font-size: 9.5pt; }
-  .proj-desc { font-size: 9.5pt; color: #555; margin-bottom: 4px; }
-  ul { margin-left: 16px; }
-  li { font-size: 10.5pt; color: #333; margin: 2px 0; }
-  p { font-size: 10.5pt; margin: 2px 0; }
-  strong { color: #111; }
-  a { color: #6c63ff; text-decoration: none; }
-  section { margin-bottom: 14px; }
+  ${template.getCSS(resolvedOptions)}
 </style>
 </head>
 <body>
-  <div class="header">
-    <div class="name">${s(data.name)}</div>
-    ${data.tagline ? `<div class="tagline">${s(data.tagline)}</div>` : ''}
-    <div class="contact">
-      ${data.contact?.email ? `<span>${s(data.contact.email)}</span>` : ''}
-      ${data.contact?.github ? `<a href="https://${s(data.contact.github)}">${s(data.contact.github)}</a>` : ''}
-      ${data.contact?.linkedin ? `<a href="https://${s(data.contact.linkedin)}">${s(data.contact.linkedin)}</a>` : ''}
-      ${data.contact?.location ? `<span>${s(data.contact.location)}</span>` : ''}
-    </div>
-  </div>
-  <hr>
-   ${shouldIncludeSection(options, 'summary') && data.summary ? `<section><p class="summary">${s(data.summary)}</p></section>` : ''}
-  ${skillsSection ? `<section>${skillsSection}</section>` : ''}
-  ${experienceSection ? `<section>${experienceSection}</section>` : ''}
-  ${projectsSection ? `<section>${projectsSection}</section>` : ''}
-  ${educationSection ? `<section>${educationSection}</section>` : ''}
-  ${certsSection ? `<section>${certsSection}</section>` : ''}
+  ${template.getHTML(data, resolvedOptions)}
 </body>
 </html>`;
 }
@@ -169,6 +55,22 @@ export function renderResumePreview(container, data, options = {}) {
   doc.write(html);
   doc.close();
 
+  return iframe;
+}
+
+export function renderTemplateThumbnail(container, templateId, options = {}) {
+  const thumbnailOptions = { ...options, templateId, pageCount: 1 };
+  const iframe = document.createElement('iframe');
+  iframe.title = `${getTemplate(templateId).name} template preview`;
+  iframe.setAttribute('aria-label', iframe.title);
+  iframe.style.cssText = 'width:333%; height:333%; transform:scale(0.3); transform-origin:top left; border:0; pointer-events:none;';
+  container.innerHTML = '';
+  container.appendChild(iframe);
+
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open();
+  doc.write(resumeToHTML(SAMPLE_RESUME, thumbnailOptions));
+  doc.close();
   return iframe;
 }
 

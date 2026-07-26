@@ -53,6 +53,8 @@
         <div class="ob-step-eyebrow">Step 1 of 3</div>
         <div class="ob-step-title">Set up your workspace</div>
         <p class="ob-step-desc">ResumeIt uses your own Gemini API key. Your data is stored only in your browser — never on any server.</p>
+        <p class="onboarding-tip">🔒 Your API key stays in this browser and is sent only to Google Gemini.</p>
+        <svg class="ob-illustration" viewBox="0 0 96 96" aria-hidden="true"><rect x="20" y="28" width="56" height="42" rx="8"/><path d="M32 28v-8a16 16 0 0 1 32 0v8M39 49l6 6 13-15"/></svg>
 
         <div class="form-group">
           <label class="form-label">Full name <span class="form-required">*</span></label>
@@ -68,6 +70,7 @@
             <input id="ob-api-key" class="form-input" type="password" placeholder="AIzaSy..." autocomplete="off" />
             <button class="api-key-toggle" onclick="toggleApiKeyVisibility('ob-api-key')" type="button" aria-label="Toggle visibility">👁</button>
           </div>
+          <p id="ob-api-feedback" class="inline-feedback" aria-live="polite"></p>
           <p class="form-hint">Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a></p>
         </div>
 
@@ -82,10 +85,13 @@
         <div class="ob-step-eyebrow">Step 2 of 3</div>
         <div class="ob-step-title">Connect your profiles</div>
         <p class="ob-step-desc">Link GitHub to include your repos and language stats in generated resumes. All fields optional.</p>
+        <p class="onboarding-tip">🐙 A GitHub profile helps surface your strongest public work.</p>
+        <svg class="ob-illustration" viewBox="0 0 96 96" aria-hidden="true"><circle cx="48" cy="48" r="26"/><path d="M34 50c3 14 25 14 28 0M39 40h.2M57 40h.2M31 35l-8-9m42 9 8-9"/></svg>
 
         <div class="form-group">
           <label class="form-label">GitHub username</label>
           <input id="ob-github" class="form-input" type="text" placeholder="octocat" />
+          <p id="ob-github-feedback" class="inline-feedback" aria-live="polite"></p>
         </div>
         <div class="form-group">
           <label class="form-label">LinkedIn URL</label>
@@ -107,6 +113,8 @@
         <div class="ob-step-eyebrow">Step 3 of 3</div>
         <div class="ob-step-title">Seed your Memory Vault</div>
         <p class="ob-step-desc">Upload an existing resume to automatically extract your experience into the Vault. You can add entries manually later too.</p>
+        <p class="onboarding-tip">✨ Importing is optional — you can start with a blank Vault any time.</p>
+        <svg class="ob-illustration" viewBox="0 0 96 96" aria-hidden="true"><path d="M28 18h28l12 12v48H28zM56 18v14h12M48 62V40m0 0-9 9m9-9 9 9"/></svg>
 
         <div class="upload-area" id="ob-upload-area">
           <input type="file" id="ob-resume-upload" accept=".pdf,.docx,.txt" />
@@ -141,37 +149,53 @@
   <!-- SIDEBAR -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
-      <span class="logo-wordmark">ResumeIt</span>
-      <span class="logo-tagline">v1.0.1 · Open Source</span>
+      <div>
+        <span class="logo-wordmark">ResumeIt</span>
+        <span class="logo-tagline">v1.1.0 · Open Source</span>
+      </div>
+      <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebarCollapse()" aria-label="Collapse sidebar" aria-expanded="true">‹</button>
     </div>
 
     <nav class="sidebar-nav" role="navigation">
-      <div class="nav-section-label">Workspace</div>
+      <div class="nav-section-label">Main</div>
       <button class="nav-item active" data-page="dashboard" id="nav-dashboard">
-        Dashboard
+        <span class="nav-icon" aria-hidden="true">⌂</span><span class="nav-label">Dashboard</span>
       </button>
       <button class="nav-item" data-page="generate" id="nav-generate">
-        Generator
+        <span class="nav-icon" aria-hidden="true">✦</span><span class="nav-label">Generator</span>
       </button>
+      <div class="generator-subnav d-none" id="generator-subnav" aria-label="Generator steps">
+        <span data-generator-step="0">Job description</span>
+        <span data-generator-step="1">GitHub</span>
+        <span data-generator-step="2">Ranking</span>
+        <span data-generator-step="4">Preview</span>
+      </div>
 
-      <div class="nav-section-label">Library</div>
+      <div class="nav-section-label">Data</div>
       <button class="nav-item" data-page="vault" id="nav-vault">
-        Memory Vault
+        <span class="nav-icon" aria-hidden="true">◫</span><span class="nav-label">Memory Vault</span>
         <span class="nav-badge" id="vault-badge">0</span>
       </button>
       <button class="nav-item" data-page="resumes" id="nav-resumes">
-        Saved Resumes
+        <span class="nav-icon" aria-hidden="true">▤</span><span class="nav-label">Saved Resumes</span>
+      </button>
+      <button class="nav-item" data-page="templates" id="nav-templates">
+        <span class="nav-icon" aria-hidden="true">▧</span><span class="nav-label">Templates</span>
       </button>
 
       <div class="nav-section-label">Account</div>
       <button class="nav-item" data-page="settings" id="nav-settings">
-        Settings
+        <span class="nav-icon" aria-hidden="true">⚙</span><span class="nav-label">Settings</span>
       </button>
     </nav>
 
-    <div class="sidebar-footer">
-      Open Source · MIT License<br>
-      <a href="https://github.com/deeyeti/resumeit" target="_blank" rel="noopener">github.com/deeyeti/resumeit</a>
+    <button class="sidebar-profile" onclick="navigate('settings')" aria-label="Open settings">
+      <img id="sidebar-profile-avatar" class="sidebar-profile-avatar" alt="" />
+      <span class="sidebar-profile-copy"><strong id="sidebar-profile-name">Your profile</strong><small id="sidebar-profile-github">Configure settings</small></span>
+      <span class="nav-icon sidebar-profile-cog" aria-hidden="true">⚙</span>
+    </button>
+    <div class="sidebar-footer nav-label">
+      Open Source · MIT License<br><a href="https://github.com/deeyeti/resumeit" target="_blank" rel="noopener">github.com/deeyeti/resumeit</a>
     </div>
   </aside>
 
@@ -180,6 +204,7 @@
 
     <!-- TOPBAR -->
     <header class="topbar">
+      <button class="mobile-menu-btn" id="mobile-menu-btn" onclick="toggleMobileSidebar()" aria-label="Open navigation" aria-expanded="false">☰</button>
       <div class="topbar-breadcrumb">
         <span class="bc-root">ResumeIt</span>
         <span class="bc-sep">›</span>
@@ -200,9 +225,17 @@
     <section class="page active" id="page-dashboard">
       <div class="page-content">
 
-        <div class="page-header">
-          <h1 class="page-title" id="dash-greeting">Good morning</h1>
-          <p class="page-desc">Your AI-powered resume generator. Paste a job description and get a tailored, ATS-optimized resume in under a minute.</p>
+        <div class="dashboard-hero">
+          <div class="hero-copy">
+            <span class="eyebrow">Your workspace</span>
+            <h1 class="page-title" id="dash-greeting">Good morning</h1>
+            <p class="page-desc">Turn your strongest experience into a tailored, ATS-ready resume.</p>
+            <button class="btn btn-primary" onclick="navigate('generate')">✨ Generate Resume</button>
+          </div>
+          <div class="hero-profile">
+            <img id="dash-avatar" class="hero-avatar" alt="" />
+            <div><strong id="dash-profile-name">Your profile</strong><span id="dash-profile-github">Add GitHub in Settings</span></div>
+          </div>
         </div>
 
         <!-- Stats -->
@@ -240,6 +273,13 @@
               <span class="qa-desc">Manage experiences and achievements</span>
             </div>
           </button>
+          <button class="quick-action-tile" onclick="navigate('templates')">
+            <div class="qa-icon">▧</div>
+            <div>
+              <span class="qa-title">Browse templates</span>
+              <span class="qa-desc">Choose your default resume style</span>
+            </div>
+          </button>
         </div>
 
         <!-- Vault notice -->
@@ -257,6 +297,11 @@
           <button class="section-action" onclick="navigate('resumes')">View all</button>
         </div>
         <div id="recent-resumes" class="resume-list"></div>
+
+        <div class="section-header mt-32">
+          <span class="section-title">Recent activity</span>
+        </div>
+        <div id="activity-timeline" class="activity-list dashboard-activity"></div>
 
       </div>
     </section>
@@ -330,6 +375,7 @@
                     class="form-textarea"
                     style="min-height:360px;font-size:var(--text-sm);line-height:var(--leading-relaxed);"
                     placeholder="Paste the complete job description here — include requirements, responsibilities, and tech stack for the best results."></textarea>
+                  <div class="token-estimate" id="jd-token-estimate" aria-live="polite">~0 tokens</div>
 
                   <div class="resume-preferences" aria-labelledby="resume-preferences-title">
                     <div class="resume-preferences-header">
@@ -461,15 +507,35 @@
                 </div>
               </div>
             </div>
+            <details class="jd-reference" id="jd-reference">
+              <summary>Target job description</summary>
+              <p id="jd-reference-text">Your job description will remain available here while ResumeIt works.</p>
+            </details>
           </div>
         </div>
 
         <!-- Step 4: Preview -->
         <div id="gen-step-4" style="display:none;">
+          <div class="template-switcher-wrap">
+            <div class="template-switcher-heading">
+              <div><span class="eyebrow">Resume design</span><strong id="active-template-label">Modern</strong></div>
+              <button class="btn btn-outline btn-sm" onclick="openTemplateBrowserModal()">Change template</button>
+            </div>
+            <div class="template-switcher" id="template-switcher" role="list" aria-label="Resume templates"></div>
+            <div class="template-options-row">
+              <fieldset class="template-option-group"><legend>Color</legend><div id="template-color-options" class="color-options"></div></fieldset>
+              <fieldset class="template-option-group"><legend>Font</legend><div id="template-font-options" class="template-font-options"></div></fieldset>
+            </div>
+          </div>
           <div class="gen-layout" style="align-items:flex-start;">
             <div class="resume-preview-wrap">
               <div class="resume-preview-toolbar">
                 <span class="preview-label">Resume preview</span>
+                <div class="preview-zoom-controls" aria-label="Preview zoom controls">
+                  <button class="btn-text btn-sm" onclick="changePreviewZoom(-10)" aria-label="Zoom out">−</button>
+                  <button class="btn-text btn-sm" onclick="resetPreviewZoom()">Fit</button>
+                  <button class="btn-text btn-sm" onclick="changePreviewZoom(10)" aria-label="Zoom in">+</button>
+                </div>
                 <button class="btn-text btn-sm" onclick="saveCurrentResume()">Save to library</button>
                 <button class="btn btn-primary btn-sm" onclick="exportCurrentResume()" id="export-pdf-btn">
                   Export PDF
@@ -495,6 +561,11 @@
                     ← Generate another
                   </button>
                 </div>
+              </div>
+
+              <div class="gen-panel">
+                <div class="gen-panel-header"><span class="gen-panel-title">Customize sections</span></div>
+                <div class="gen-panel-body section-toggle-list" id="preview-section-toggles"></div>
               </div>
 
               <div style="padding:14px 16px;background:var(--bg-subtle);border:1px solid var(--border);border-radius:var(--radius-md);">
@@ -531,6 +602,25 @@
       </div>
     </section>
 
+    <!-- ===== TEMPLATE BROWSER ===== -->
+    <section class="page" id="page-templates">
+      <div class="page-content">
+        <div class="page-header template-page-header">
+          <div>
+            <h1 class="page-title">Templates</h1>
+            <p class="page-desc">Pick a visual system for your resume. Your default is used for every new generation.</p>
+          </div>
+          <button class="btn btn-outline" onclick="setDefaultTemplate()">Set selected as default</button>
+        </div>
+        <div id="template-grid" class="template-grid"></div>
+        <div class="template-customization-panel">
+          <div><span class="eyebrow">Customize selected template</span><h2 id="template-customization-title">Modern</h2></div>
+          <fieldset class="template-option-group"><legend>Accent color</legend><div id="template-page-color-options" class="color-options"></div></fieldset>
+          <fieldset class="template-option-group"><legend>Font pairing</legend><div id="template-page-font-options" class="template-font-options"></div></fieldset>
+        </div>
+      </div>
+    </section>
+
     <!-- ===== SETTINGS ===== -->
     <section class="page" id="page-settings">
       <div class="page-content">
@@ -561,6 +651,12 @@
               <input id="set-location" class="form-input" type="text" placeholder="San Francisco, CA" />
             </div>
           </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">Default resume template</div>
+          <p class="settings-row-desc" style="margin-bottom:14px;">New resumes use your selected template, accent color, and font pairing.</p>
+          <button class="btn btn-outline" onclick="navigate('templates')">Manage templates</button>
         </div>
 
         <!-- API -->
@@ -677,6 +773,22 @@
     <div class="modal-footer">
       <button class="btn-text btn-text-muted" onclick="closeConfirm()" id="confirm-cancel-btn" type="button">Cancel</button>
       <button class="btn btn-primary" onclick="executeConfirm()" id="confirm-ok-btn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TEMPLATE PREVIEW MODAL ===== -->
+<div class="modal-overlay template-preview-modal" id="template-preview-modal" role="dialog" aria-modal="true" aria-labelledby="template-preview-title">
+  <div class="modal template-preview-dialog">
+    <div class="modal-header">
+      <div><div class="modal-title" id="template-preview-title">Template preview</div><p id="template-preview-description" class="modal-subtitle"></p></div>
+      <button class="modal-close" onclick="closeTemplatePreviewModal()" aria-label="Close template preview">✕</button>
+    </div>
+    <div class="template-preview-body"><div id="template-preview-modal-container"></div></div>
+    <div class="modal-footer">
+      <span id="template-preview-caution" class="template-caution d-none">Compact uses columns; some older ATS tools may read it less reliably.</span>
+      <button class="btn btn-outline" onclick="closeTemplatePreviewModal()">Cancel</button>
+      <button class="btn btn-primary" id="template-preview-use-btn" onclick="usePreviewTemplate()">Use this template</button>
     </div>
   </div>
 </div>

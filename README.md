@@ -1,4 +1,4 @@
-# ResumeIt v1.0.1 📝
+# ResumeIt v1.1.0 📝
 
 > **AI-Driven Resume Generator for Software Engineers**  
 > Open Source · Privacy-First · Zero Backend
@@ -32,6 +32,9 @@ ResumeIt is a **client-side, AI-powered resume generator** built specifically fo
 | Feature | Description |
 |---|---|
 | 🎯 **JD-Tailored Generation** | Paste any job description → get a resume optimized for it |
+| 📐 **Six Resume Templates** | Live-switch between Classic, Modern, Minimal, Compact, Executive, and Technical layouts |
+| 🎨 **Design Controls** | Set a default template, then choose one of five accent colors and three font pairings |
+| 👁️ **Live Template Browser** | Browse live miniature previews, inspect a full preview, and apply a template without re-generating content |
 | 📄 **1- or 2-Page Target** | Choose a concise one-page resume or allow up to two pages of detail |
 | 🎛️ **Content Controls** | Choose included sections, highlight skills/languages, prioritise Vault entries, and add custom instructions |
 | 🗄️ **Memory Vault** | Persistent local DB of your experiences (IndexedDB) |
@@ -42,7 +45,7 @@ ResumeIt is a **client-side, AI-powered resume generator** built specifically fo
 | 📥 **Resume Import** | Upload PDF/DOCX → AI extracts entries into your Vault |
 | 🔒 **Zero-Tracking** | API keys and data stored only in browser localStorage/IndexedDB |
 
-### Resume customisation
+### Resume customisation and templates
 
 Before generation, use **Resume preferences** to control the output without editing the job description:
 
@@ -53,6 +56,10 @@ Before generation, use **Resume preferences** to control the output without edit
 - Add any other instructions, such as focusing on a particular project or leadership impact.
 
 These choices are used in the AI prompt, applied to the live preview and PDF export, and saved with each resume in your library.
+
+Version 1.1 adds a **Templates** workspace where you can select a global default design, change its accent color and font pairing, and preview all six layouts with sample resume data. At the generator preview step, templates switch instantly without another Gemini request. Your selected template, color, font pairing, and section visibility are preserved with saved resumes.
+
+The Compact template uses a two-column presentation to fit dense technical profiles. It includes an in-app ATS caution because older applicant tracking systems may read columns less reliably.
 
 ---
 
@@ -92,7 +99,16 @@ resumeit/
     ├── github.js           # GitHub REST API integration
     ├── llm.js              # Gemini API orchestration
     ├── parser.js           # Client-side PDF/DOCX parser
-    └── exporter.js         # ATS-compliant PDF export and page/section controls
+    ├── exporter.js         # PDF/preview rendering and page controls
+    └── templates/          # Template registry, shared renderer, and six layouts
+        ├── index.js        # Template registry and selection helpers
+        ├── shared.js       # ATS HTML/CSS primitives and preview fixture
+        ├── classic.js      # Traditional single-column layout
+        ├── modern.js       # Accent-led technology layout
+        ├── minimal.js      # Whitespace-forward layout
+        ├── compact.js      # Dense two-column layout
+        ├── executive.js    # Leadership header-band layout
+        └── technical.js    # Monospace, grid-inspired layout
 ```
 
 **Tech stack:** Vanilla HTML + CSS + JavaScript ES Modules. No framework, no build step, no bundler.
@@ -139,8 +155,8 @@ This project uses **semantic versioning** (`MAJOR.MINOR.PATCH`).
 
 To create a new release:
 ```bash
-git tag v1.0.1
-git push origin v1.0.1
+git tag v1.1.0
+git push origin v1.1.0
 # GitHub Actions will automatically create a GitHub Release with changelog
 ```
 
