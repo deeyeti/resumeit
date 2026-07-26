@@ -52,14 +52,11 @@ function showToast(message, type = 'info', duration = 4000) {
   const container = document.getElementById('toast-container');
   if (!container) return;
 
-  const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
-
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   toast.innerHTML = `
-    <span class="toast-icon">${icons[type]}</span>
-    <span class="toast-message">${message}</span>
-    <span class="toast-close" onclick="this.parentElement.remove()">✕</span>
+    <span class="toast-msg">${message}</span>
+    <button class="toast-close" onclick="this.parentElement.remove()" type="button">✕</button>
   `;
 
   container.appendChild(toast);
@@ -79,18 +76,16 @@ function navigate(page) {
 
   state.currentPage = page;
 
-  // Update topbar
   const titles = {
-    dashboard: ['Dashboard', 'Overview of your resume activity'],
-    vault: ['Memory Vault', 'Your experiences, projects & achievements'],
-    generate: ['Resume Generator', 'Generate a tailored, ATS-optimized resume'],
-    resumes: ['Saved Resumes', 'Your previously generated resumes'],
-    settings: ['Settings', 'Configure your API keys and preferences'],
+    dashboard: 'Dashboard',
+    vault: 'Memory Vault',
+    generate: 'Generator',
+    resumes: 'Saved Resumes',
+    settings: 'Settings',
   };
 
-  const [title, subtitle] = titles[page] || ['ResumeIt', ''];
-  document.getElementById('topbar-title').textContent = title;
-  document.getElementById('topbar-subtitle').textContent = subtitle;
+  const nameEl = document.getElementById('topbar-page-name');
+  if (nameEl) nameEl.textContent = titles[page] || 'ResumeIt';
 
   if (page === 'dashboard') renderDashboard();
   if (page === 'vault') renderVault();
@@ -116,21 +111,16 @@ function hideOnboarding() {
 
 function gotoOnboardingStep(step) {
   onboardingStep = step;
-  document.querySelectorAll('.onboarding-step').forEach((el, i) => {
+  // Show correct step
+  document.querySelectorAll('.ob-step').forEach((el, i) => {
     el.classList.toggle('active', i === step);
   });
-
-  document.querySelectorAll('.onboarding-step-dot').forEach((dot, i) => {
-    dot.classList.remove('active', 'done');
-    if (i === step) dot.classList.add('active');
-    else if (i < step) dot.classList.add('done');
+  // Update progress track
+  document.querySelectorAll('.ob-progress-step').forEach((el, i) => {
+    el.classList.remove('active', 'done');
+    if (i === step) el.classList.add('active');
+    else if (i < step) el.classList.add('done');
   });
-
-  // Update nav button states
-  const backBtn = document.getElementById('ob-back');
-  const nextBtn = document.getElementById('ob-next');
-  if (backBtn) backBtn.style.display = step === 0 ? 'none' : 'block';
-  if (nextBtn) nextBtn.textContent = step === ONBOARDING_STEPS - 1 ? '🚀 Launch App' : 'Continue →';
 }
 
 async function onboardingNext() {
@@ -210,7 +200,7 @@ async function refreshData() {
 }
 
 function updateNavBadges() {
-  const vaultBadge = document.querySelector('[data-page="vault"] .nav-badge');
+  const vaultBadge = document.getElementById('vault-badge');
   if (vaultBadge) vaultBadge.textContent = state.vaultEntries.length;
 }
 
@@ -224,34 +214,33 @@ async function renderDashboard() {
   document.getElementById('stat-resumes').textContent = resumeCount;
   document.getElementById('stat-github').textContent = settings.github || '—';
 
-  // Recent resumes
   const recentEl = document.getElementById('recent-resumes');
   if (state.savedResumes.length === 0) {
     recentEl.innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-icon">📄</div>
-        <div class="empty-state-title">No resumes yet</div>
-        <div class="empty-state-desc">Generate your first tailored resume by pasting a job description</div>
-        <button class="btn btn-primary mt-16" onclick="navigate('generate')">✨ Generate Resume</button>
+        <div class="empty-state-title">No resumes generated yet</div>
+        <p class="empty-state-desc">Paste a job description in the Generator to create your first tailored resume.</p>
+        <button class="btn btn-primary" onclick="navigate('generate')" style="margin-top:12px;">Open generator</button>
       </div>`;
   } else {
     const recents = [...state.savedResumes].reverse().slice(0, 3);
     recentEl.innerHTML = recents.map(r => `
-      <div class="resume-list-item" onclick="viewSavedResume(${r.id})">
-        <div class="rli-icon">📄</div>
-        <div class="rli-info">
-          <div class="rli-title">${escHtml(r.jobTitle || 'Resume')}</div>
-          <div class="rli-meta">${formatDate(r.createdAt)} · ${r.company || 'General'}</div>
+      <div class="resume-row" onclick="viewSavedResume(${r.id})">
+        <div class="resume-row-icon">◻</div>
+        <div class="resume-row-info">
+          <div class="resume-row-title">${escHtml(r.jobTitle || 'Resume')}</div>
+          <div class="resume-row-meta">${formatDate(r.createdAt)}</div>
         </div>
-        <div class="rli-actions">
-          <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); downloadResume(${r.id})">⬇️ PDF</button>
+        <div class="resume-row-actions">
+          <button class="btn-text btn-sm" onclick="event.stopPropagation(); downloadResume(${r.id})">Download PDF</button>
         </div>
       </div>`).join('');
   }
 
-  // Vault tips
-  if (vaultCount === 0) {
-    document.getElementById('vault-tip').classList.remove('d-none');
+  const tipEl = document.getElementById('vault-tip');
+  if (tipEl) {
+    if (vaultCount === 0) tipEl.classList.remove('d-none');
+    else tipEl.classList.add('d-none');
   }
 }
 
@@ -262,39 +251,36 @@ function renderVault() {
   if (state.vaultEntries.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-icon">🗄️</div>
         <div class="empty-state-title">Memory Vault is empty</div>
-        <div class="empty-state-desc">Add your work experiences, projects, and achievements. The AI uses these to build your resume.</div>
-        <button class="btn btn-primary mt-16" onclick="openVaultModal()">+ Add First Entry</button>
+        <p class="empty-state-desc">Add your work experiences, projects, and achievements. The AI selects the most relevant entries for each job description.</p>
+        <button class="btn btn-primary" onclick="openVaultModal()" style="margin-top:12px;">Add first entry</button>
       </div>`;
     return;
   }
 
   container.innerHTML = state.vaultEntries.map(entry => `
-    <div class="vault-entry animate-fade-in-up" id="vault-entry-${entry.id}">
-      <div class="vault-entry-header">
-        <div>
-          <div class="vault-entry-title">${escHtml(entry.title)}</div>
-          <div class="vault-entry-context">${escHtml(entry.context || '')}</div>
+    <div class="vault-entry" id="vault-entry-${entry.id}">
+      <div class="vault-entry-body">
+        <div class="vault-entry-title">${escHtml(entry.title)}</div>
+        <div class="vault-entry-context">
+          ${entry.context ? `<span>${escHtml(entry.context)}</span>` : ''}
+          ${entry.dateRange ? `<span style="color:var(--text-muted)">${escHtml(entry.dateRange)}</span>` : ''}
+          ${entry.type ? `<span class="tag" style="font-size:10px;">${entry.type}</span>` : ''}
         </div>
-        <div class="vault-entry-actions">
-          <button class="btn btn-sm btn-secondary btn-icon" onclick="openVaultModal(${entry.id})" title="Edit">✏️</button>
-          <button class="btn btn-sm btn-danger btn-icon" onclick="confirmDeleteVault(${entry.id})" title="Delete">🗑️</button>
-        </div>
+        ${entry.bulletPoints?.length ? `
+          <div class="vault-entry-bullets">
+            ${entry.bulletPoints.slice(0, 3).map(b => `<div class="vault-entry-bullet">${escHtml(b)}</div>`).join('')}
+            ${entry.bulletPoints.length > 3 ? `<span style="font-size:var(--text-xs);color:var(--text-muted);margin-top:2px;">+${entry.bulletPoints.length - 3} more</span>` : ''}
+          </div>` : ''}
+        ${entry.techStack?.length ? `
+          <div class="vault-entry-stack">
+            ${entry.techStack.map(t => `<span class="tag">${escHtml(t)}</span>`).join('')}
+          </div>` : ''}
       </div>
-      <div class="vault-entry-meta">
-        ${entry.dateRange ? `<span>📅 ${escHtml(entry.dateRange)}</span>` : ''}
-        ${entry.type ? `<span><span class="tag tag-${entry.type === 'experience' ? 'purple' : entry.type === 'project' ? 'emerald' : 'amber'}">${entry.type}</span></span>` : ''}
+      <div class="vault-entry-actions">
+        <button class="btn-text" style="font-size:var(--text-xs);" onclick="openVaultModal(${entry.id})">Edit</button>
+        <button class="btn-danger-text" style="font-size:var(--text-xs);" onclick="confirmDeleteVault(${entry.id})">Delete</button>
       </div>
-      ${entry.bulletPoints?.length ? `
-        <div class="vault-entry-bullets">
-          ${entry.bulletPoints.slice(0, 3).map(b => `<div class="vault-entry-bullet">${escHtml(b)}</div>`).join('')}
-          ${entry.bulletPoints.length > 3 ? `<div class="text-muted" style="font-size:0.78rem;margin-top:4px;">+${entry.bulletPoints.length - 3} more bullets</div>` : ''}
-        </div>` : ''}
-      ${entry.techStack?.length ? `
-        <div class="vault-entry-stack">
-          ${entry.techStack.map(t => `<span class="tag tag-sky">${escHtml(t)}</span>`).join('')}
-        </div>` : ''}
     </div>
   `).join('');
 }
@@ -634,42 +620,36 @@ function renderGitHubStats(data) {
   const container = document.getElementById('github-stats-panel');
   if (!data) { container.innerHTML = ''; return; }
 
-  const topLangs = data.languages.slice(0, 4);
+  const topLangs = data.languages.slice(0, 5);
 
   container.innerHTML = `
-    <div class="section-header" style="margin-bottom:14px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <div>
-        <div class="section-title">GitHub Profile</div>
-        <div class="section-subtitle">@${data.user.login}</div>
+        <div style="font-weight:600;font-size:var(--text-sm);">@${escHtml(data.user.login)}</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:1px;">${data.user.publicRepos} public repos</div>
       </div>
-      <img src="${data.user.avatar}" style="width:36px;height:36px;border-radius:50%;border:2px solid var(--border-active);" alt="avatar">
+      <img src="${data.user.avatar}" style="width:32px;height:32px;border-radius:50%;border:1px solid var(--border);" alt="GitHub avatar">
     </div>
-    <div class="github-stats-grid">
-      <div class="github-stat-item">
-        <div class="gsv text-accent">${data.user.publicRepos}</div>
-        <div class="gsl">Public Repos</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;margin-bottom:14px;">
+      <div style="background:var(--bg-page);padding:10px 12px;">
+        <div style="font-family:var(--font-serif);font-size:var(--text-xl);font-weight:700;">${data.activity.recentCommits}</div>
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-top:1px;">Recent commits</div>
       </div>
-      <div class="github-stat-item">
-        <div class="gsv text-accent">${data.activity.recentCommits}</div>
-        <div class="gsl">Recent Commits</div>
-      </div>
-      <div class="github-stat-item">
-        <div class="gsv text-accent">${data.user.followers}</div>
-        <div class="gsl">Followers</div>
-      </div>
-      <div class="github-stat-item">
-        <div class="gsv text-accent">${data.topRepos.reduce((s, r) => s + r.stars, 0)}</div>
-        <div class="gsl">Total Stars</div>
+      <div style="background:var(--bg-page);padding:10px 12px;">
+        <div style="font-family:var(--font-serif);font-size:var(--text-xl);font-weight:700;">${data.user.followers}</div>
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-top:1px;">Followers</div>
       </div>
     </div>
-    <div style="margin-top:14px;">
-      <div class="section-title" style="font-size:0.8rem;margin-bottom:8px;">Top Languages</div>
-      ${topLangs.map(l => `
-        <div class="lang-bar">
-          <div class="lang-bar-label"><span>${l.lang}</span><span>${l.percent}%</span></div>
-          <div class="progress"><div class="progress-bar" style="width:${l.percent}%; background: var(--gradient-primary);"></div></div>
-        </div>`).join('')}
-    </div>`;
+    <div style="font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Top languages</div>
+    ${topLangs.map(l => `
+      <div style="margin-bottom:6px;">
+        <div style="display:flex;justify-content:space-between;font-size:var(--text-xs);margin-bottom:3px;">
+          <span style="color:var(--text-secondary);">${escHtml(l.lang)}</span>
+          <span style="color:var(--text-muted);">${l.percent}%</span>
+        </div>
+        <div class="progress"><div class="progress-fill" style="width:${l.percent}%;"></div></div>
+      </div>`).join('')}
+  `;
 }
 
 function renderRankedEntries(entries) {
@@ -742,25 +722,24 @@ function renderResumes() {
   if (state.savedResumes.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-icon">📂</div>
         <div class="empty-state-title">No saved resumes</div>
-        <div class="empty-state-desc">Generated resumes will appear here after you save them</div>
-        <button class="btn btn-primary mt-16" onclick="navigate('generate')">✨ Generate Resume</button>
+        <p class="empty-state-desc">Generated resumes will appear here after you save them.</p>
+        <button class="btn btn-primary" onclick="navigate('generate')" style="margin-top:12px;">Open generator</button>
       </div>`;
     return;
   }
 
   const sorted = [...state.savedResumes].reverse();
   container.innerHTML = sorted.map(r => `
-    <div class="resume-list-item" onclick="viewSavedResume(${r.id})">
-      <div class="rli-icon">📄</div>
-      <div class="rli-info">
-        <div class="rli-title">${escHtml(r.jobTitle || 'Resume')}</div>
-        <div class="rli-meta">${formatDate(r.createdAt)} · ${r.company || 'General'}</div>
+    <div class="resume-row" onclick="viewSavedResume(${r.id})">
+      <div class="resume-row-icon">◻</div>
+      <div class="resume-row-info">
+        <div class="resume-row-title">${escHtml(r.jobTitle || 'Resume')}</div>
+        <div class="resume-row-meta">${formatDate(r.createdAt)}</div>
       </div>
-      <div class="rli-actions">
-        <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); downloadResume(${r.id})">⬇️ PDF</button>
-        <button class="btn btn-sm btn-danger btn-icon" onclick="event.stopPropagation(); confirmDeleteResume(${r.id})">🗑️</button>
+      <div class="resume-row-actions">
+        <button class="btn-text btn-sm" onclick="event.stopPropagation(); downloadResume(${r.id})">Download PDF</button>
+        <button class="btn-danger-text" style="font-size:var(--text-xs);" onclick="event.stopPropagation(); confirmDeleteResume(${r.id})">Delete</button>
       </div>
     </div>
   `).join('');
@@ -978,13 +957,13 @@ Object.assign(window, {
 
   // Wire up onboarding nav buttons
   document.getElementById('ob-next')?.addEventListener('click', onboardingNext);
+  document.getElementById('ob-next-2')?.addEventListener('click', onboardingNext);
+  document.getElementById('ob-finish')?.addEventListener('click', onboardingNext);
   document.getElementById('ob-back')?.addEventListener('click', () => {
     if (onboardingStep > 0) gotoOnboardingStep(onboardingStep - 1);
   });
-  document.getElementById('ob-skip')?.addEventListener('click', () => {
-    ls.set('onboarded', true);
-    hideOnboarding();
-    navigate('dashboard');
+  document.getElementById('ob-back-2')?.addEventListener('click', () => {
+    if (onboardingStep > 0) gotoOnboardingStep(onboardingStep - 1);
   });
 
   // Nav clicks
