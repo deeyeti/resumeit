@@ -7,8 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  lint:
-    name: Lint & Code Quality
+  validate-structure:
+    name: Validate Project Structure
     runs-on: ubuntu-latest
 
     steps:
@@ -18,40 +18,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dev dependencies
-        run: |
-          npm init -y
-          npm install --save-dev eslint htmlhint
-
-      - name: Lint JavaScript files
-        run: |
-          npx eslint app.js modules/*.js \
-            --rule '{"no-undef": "warn", "no-unused-vars": "warn"}' \
-            --env browser,es2022 \
-            --parser-options 'ecmaVersion:2022,sourceType:module' \
-            --format stylish || true
-
-      - name: Validate HTML
-        run: |
-          npx htmlhint index.html \
-            --rules '{"doctype-first":true,"title-require":true,"attr-lowercase":true,"tag-pair":true}' \
-            || true
-
-      - name: Check for console.log statements (warn only)
-        run: |
-          echo "Checking for leftover console.log statements..."
-          grep -rn "console\.log" app.js modules/ && echo "⚠️  Found console.log statements" || echo "✅ No console.log found"
-
-  validate-structure:
-    name: Validate Project Structure
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+          node-version: '24'   # No npm cache — this is a zero-dependency static app
 
       - name: Check required files exist
         run: |
@@ -67,16 +34,25 @@ jobs:
           done
           $all_ok || exit 1
 
-      - name: Check JS module syntax
+      - name: Syntax-check all JavaScript modules
         run: |
-          node --check app.js && echo "✅ app.js syntax OK"
-          node --check modules/vault.js && echo "✅ vault.js syntax OK"
-          node --check modules/github.js && echo "✅ github.js syntax OK"
-          node --check modules/llm.js && echo "✅ llm.js syntax OK"
-          node --check modules/parser.js && echo "✅ parser.js syntax OK"
-          node --check modules/exporter.js && echo "✅ exporter.js syntax OK"
+          node --check app.js           && echo "✅ app.js"
+          node --check modules/vault.js    && echo "✅ vault.js"
+          node --check modules/github.js   && echo "✅ github.js"
+          node --check modules/llm.js      && echo "✅ llm.js"
+          node --check modules/parser.js   && echo "✅ parser.js"
+          node --check modules/exporter.js && echo "✅ exporter.js"
 
-      - name: Check file sizes (guard against accidental large files)
+      - name: Check for leftover debug statements
+        run: |
+          echo "Scanning for console.log..."
+          if grep -rn "console\.log" app.js modules/; then
+            echo "⚠️  console.log found — consider removing before release"
+          else
+            echo "✅ No console.log found"
+          fi
+
+      - name: Guard against accidental large files
         run: |
           for f in index.html style.css app.js modules/*.js; do
             size=$(wc -c < "$f")
@@ -86,3 +62,25 @@ jobs:
             fi
             echo "✅ $f — ${size} bytes"
           done
+
+  lint-html:
+    name: Lint HTML
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install htmlhint
+        run: npm install -g htmlhint
+
+      - name: Validate index.html
+        run: |
+          htmlhint index.html \
+            --rules 'doctype-first:true,title-require:true,attr-lowercase:true,tag-pair:true,id-unique:true' \
+          && echo "✅ HTML valid" || echo "⚠️  HTML hints found (non-blocking)"

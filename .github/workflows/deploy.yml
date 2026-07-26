@@ -5,7 +5,7 @@ on:
     branches: [main]      # Auto-deploy on every push to main
   release:
     types: [published]    # Also deploy when a release is published
-  workflow_dispatch:      # Allow manual trigger
+  workflow_dispatch:      # Allow manual trigger from GitHub UI
 
 permissions:
   contents: read
@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: "pages"
-  cancel-in-progress: false
+  cancel-in-progress: false  # Don’t cancel mid-deploy — finish then start fresh
 
 jobs:
   deploy:
@@ -48,11 +48,15 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true   # Automatically enables GitHub Pages if not already on
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'     # Deploy the entire project root
+          path: '.'          # Deploy entire project root
+          # Exclude the SRS PDF from the public deployment
+          exclude: '*.pdf'
 
       - name: Deploy to GitHub Pages
         id: deployment
