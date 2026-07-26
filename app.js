@@ -449,12 +449,55 @@ async function confirmDeleteVault(id) {
 }
 
 // ===== GENERATOR =====
+const RESUME_SECTION_LABELS = {
+  summary: 'Summary',
+  skills: 'Skills & languages',
+  experience: 'Experience',
+  projects: 'Projects',
+  education: 'Education',
+  certifications: 'Certifications',
+};
+
+function createDefaultResumePreferences() {
+  return {
+    pageCount: 1,
+    sections: Object.fromEntries(Object.keys(RESUME_SECTION_LABELS).map(key => [key, true])),
+    highlightedSkills: [],
+    selectedVaultIds: [],
+    additionalInstructions: '',
+  };
+}
+
+function normalizeResumePreferences(preferences = {}) {
+  const defaults = createDefaultResumePreferences();
+  const sections = Object.fromEntries(Object.keys(RESUME_SECTION_LABELS).map(key => [
+    key,
+    preferences.sections?.[key] !== false,
+  ]));
+
+  return {
+    ...defaults,
+    pageCount: Number(preferences.pageCount) === 2 ? 2 : 1,
+    sections,
+    highlightedSkills: Array.isArray(preferences.highlightedSkills)
+      ? preferences.highlightedSkills.filter(skill => typeof skill === 'string' && skill.trim()).map(skill => skill.trim())
+      : [],
+    selectedVaultIds: Array.isArray(preferences.selectedVaultIds)
+      ? preferences.selectedVaultIds.map(Number).filter(Number.isFinite)
+      : [],
+    additionalInstructions: typeof preferences.additionalInstructions === 'string'
+      ? preferences.additionalInstructions.trim()
+      : '',
+  };
+}
+
 let generatorState = {
   jd: '',
   githubData: null,
   rankedEntries: [],
   generatedResume: null,
   currentStep: 0,
+  preferences: createDefaultResumePreferences(),
 };
 
 function initGenerator() {
@@ -463,6 +506,7 @@ function initGenerator() {
   generatorState.githubData = null;
   generatorState.rankedEntries = [];
   generatorState.generatedResume = null;
+  generatorState.preferences = createDefaultResumePreferences();
 
   // Reset visibility
   const step0 = document.getElementById('gen-step-0');
@@ -494,6 +538,7 @@ function initGenerator() {
   });
 
   renderGeneratorVaultSummary();
+  renderResumePreferencesForm();
 }
 
 function showGeneratorStep(step) {
@@ -558,6 +603,114 @@ function renderGeneratorVaultSummary() {
     : '');
 }
 
+function renderResumePreferencesForm() {
+  const preferences = normalizeResumePreferences(generatorState.preferences);
+  generatorState.preferences = preferences;
+
+  const pageCountInput = document.querySelector(`input[name="page-count"][value="${preferences.pageCount}"]`);
+  if (pageCountInput) pageCountInput.checked = true;
+
+  document.querySelectorAll('[data-resume-section]').forEach(input => {
+    input.checked = preferences.sections[input.dataset.resumeSection] !== false;
+  });
+
+  const instructions = document.getElementById('resume-instructions');
+  if (instructions) instructions.value = preferences.additionalInstructions;
+
+  renderHighlightedSkills();
+  renderVaultPreferences();
+}
+
+function readResumePreferences() {
+  const pageCount = Number(document.querySelector('input[name="page-count"]:checked')?.value);
+  const sections = Object.fromEntries(Object.keys(RESUME_SECTION_LABELS).map(key => {
+    const input = document.querySelector(`[data-resume-section="${key}"]`);
+    return [key, input?.checked !== false];
+  }));
+
+  return normalizeResumePreferences({
+    ...generatorState.preferences,
+    pageCount,
+    sections,
+    additionalInstructions: document.getElementById('resume-instructions')?.value || '',
+  });
+}
+
+function renderHighlightedSkills() {
+  const container = document.getElementById('highlighted-skills-tags');
+  if (!container) return;
+
+  container.innerHTML = generatorState.preferences.highlightedSkills.map((skill, index) => `
+    <span class="selected-tag">
+      ${escHtml(skill)}
+      <button type="button" onclick="removeHighlightedSkill(${index})" aria-label="Remove ${escHtml(skill)}">✕</button>
+    </span>
+  `).join('');
+}
+
+function addHighlightedSkill() {
+  const input = document.getElementById('highlighted-skill-input');
+  const skill = input?.value.trim();
+  if (!skill) return;
+
+  const exists = generatorState.preferences.highlightedSkills.some(item => item.toLowerCase() === skill.toLowerCase());
+  if (!exists) {
+    generatorState.preferences.highlightedSkills.push(skill);
+    renderHighlightedSkills();
+  }
+  input.value = '';
+  input.focus();
+}
+
+function removeHighlightedSkill(index) {
+  generatorState.preferences.highlightedSkills.splice(index, 1);
+  renderHighlightedSkills();
+}
+
+function renderVaultPreferences() {
+  const container = document.getElementById('vault-preferences-list');
+  if (!container) return;
+
+  if (state.vaultEntries.length === 0) {
+    container.innerHTML = '<p style="font-size:var(--text-xs);color:var(--text-muted);">Your Vault is empty. Add an entry to prioritise it here.</p>';
+    return;
+  }
+
+  const selectedIds = new Set(generatorState.preferences.selectedVaultIds);
+  container.innerHTML = state.vaultEntries.map(entry => `
+    <label class="vault-preference-option">
+      <input type="checkbox" ${selectedIds.has(entry.id) ? 'checked' : ''} onchange="togglePreferredVaultEntry(${entry.id}, this.checked)" />
+      <span>
+        <strong>${escHtml(entry.title)}</strong>
+        <small>${escHtml(entry.context || entry.type || 'Vault entry')}</small>
+      </span>
+    </label>
+  `).join('');
+}
+
+function togglePreferredVaultEntry(id, selected) {
+  const entryId = Number(id);
+  const selectedIds = new Set(generatorState.preferences.selectedVaultIds);
+  if (selected) selectedIds.add(entryId);
+  else selectedIds.delete(entryId);
+  generatorState.preferences.selectedVaultIds = [...selectedIds];
+}
+
+function renderResumePreferencesSummary() {
+  const container = document.getElementById('resume-preferences-summary');
+  if (!container) return;
+
+  const preferences = normalizeResumePreferences(generatorState.preferences);
+  const includedSections = Object.entries(RESUME_SECTION_LABELS)
+    .filter(([key]) => preferences.sections[key])
+    .map(([, label]) => label);
+  const highlights = preferences.highlightedSkills.length
+    ? ` Highlighting: ${preferences.highlightedSkills.map(escHtml).join(', ')}.`
+    : '';
+
+  container.innerHTML = `<strong>${preferences.pageCount}-page target</strong>${includedSections.map(escHtml).join(', ')} included.${highlights}`;
+}
+
 async function startGeneration() {
   const jd = document.getElementById('jd-input').value.trim();
   if (!jd || jd.length < 50) {
@@ -572,10 +725,17 @@ async function startGeneration() {
     return;
   }
 
+  const preferences = readResumePreferences();
+  if (!Object.values(preferences.sections).some(Boolean)) {
+    showToast('Select at least one resume section to continue', 'error');
+    return;
+  }
+
   generatorState.jd = jd;
   generatorState.githubData = null;
   generatorState.rankedEntries = [];
   generatorState.generatedResume = null;
+  generatorState.preferences = preferences;
 
   showGeneratorStep(1);
 
@@ -604,18 +764,22 @@ async function startGeneration() {
   showGeneratorStep(2);
 
   // Step 2: Rank vault entries
-  if (state.vaultEntries.length > 0) {
+  const vaultEntriesToRank = preferences.selectedVaultIds.length > 0
+    ? state.vaultEntries.filter(entry => preferences.selectedVaultIds.includes(entry.id))
+    : state.vaultEntries;
+
+  if (vaultEntriesToRank.length > 0) {
     statusIcon.textContent = '🧠';
-    statusText.textContent = `Ranking ${state.vaultEntries.length} Memory Vault entries against JD...`;
+    statusText.textContent = `Ranking ${vaultEntriesToRank.length} Memory Vault entries against JD...`;
 
     try {
-      generatorState.rankedEntries = await rankVaultEntries(settings.apiKey, jd, state.vaultEntries);
+      generatorState.rankedEntries = await rankVaultEntries(settings.apiKey, jd, vaultEntriesToRank);
       renderRankedEntries(generatorState.rankedEntries);
       statusIcon.textContent = '✅';
       statusText.textContent = `Ranked ${generatorState.rankedEntries.length} entries by relevance`;
     } catch (e) {
       showToast('Ranking failed: ' + e.message, 'error');
-      generatorState.rankedEntries = state.vaultEntries;
+      generatorState.rankedEntries = vaultEntriesToRank;
     }
   } else {
     statusIcon.textContent = 'ℹ️';
@@ -642,7 +806,8 @@ async function startGeneration() {
       jd,
       generatorState.rankedEntries,
       generatorState.githubData,
-      userProfile
+      userProfile,
+      preferences
     );
 
     statusIcon.textContent = '🎉';
@@ -713,18 +878,18 @@ function renderRankedEntries(entries) {
 
 function renderResumeResult(data) {
   const container = document.getElementById('resume-preview-container');
-  renderResumePreview(container, data);
+  renderResumePreview(container, data, generatorState.preferences);
+  renderResumePreferencesSummary();
 }
 
 async function saveCurrentResume() {
   if (!generatorState.generatedResume) return;
-  const settings = getSettings();
-
   const resumeData = {
     jobTitle: generatorState.generatedResume.tagline || 'Resume',
     company: '',
     jd: generatorState.jd,
     resumeData: generatorState.generatedResume,
+    resumeOptions: normalizeResumePreferences(generatorState.preferences),
   };
 
   try {
@@ -746,7 +911,7 @@ async function exportCurrentResume() {
 
   try {
     const filename = getResumeFilename(generatorState.generatedResume);
-    await exportToPDF(generatorState.generatedResume, filename);
+    await exportToPDF(generatorState.generatedResume, filename, generatorState.preferences);
     showToast('PDF exported!', 'success');
   } catch (e) {
     showToast('Export failed: ' + e.message, 'error');
@@ -793,6 +958,8 @@ async function viewSavedResume(id) {
   navigate('generate');
   generatorState.generatedResume = resume.resumeData;
   generatorState.jd = resume.jd || '';
+  generatorState.preferences = normalizeResumePreferences(resume.resumeOptions);
+  renderResumePreferencesForm();
   showGeneratorStep(4);
   setTimeout(() => renderResumeResult(resume.resumeData), 100);
 }
@@ -802,7 +969,7 @@ async function downloadResume(id) {
   if (!resume?.resumeData) return;
 
   try {
-    await exportToPDF(resume.resumeData, getResumeFilename(resume.resumeData));
+    await exportToPDF(resume.resumeData, getResumeFilename(resume.resumeData), resume.resumeOptions);
     showToast('PDF exported!', 'success');
   } catch (e) {
     showToast('Export failed: ' + e.message, 'error');
@@ -970,6 +1137,9 @@ Object.assign(window, {
   removeTech,
   addBullet,
   removeBullet,
+  addHighlightedSkill,
+  removeHighlightedSkill,
+  togglePreferredVaultEntry,
   startGeneration,
   saveCurrentResume,
   exportCurrentResume,
@@ -1020,6 +1190,10 @@ Object.assign(window, {
 
   document.getElementById('vm-bullet-input')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); addBullet(); }
+  });
+
+  document.getElementById('highlighted-skill-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addHighlightedSkill(); }
   });
 
   // Close modals on overlay click

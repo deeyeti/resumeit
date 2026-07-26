@@ -1,4 +1,4 @@
-# ResumeIt 📝
+# ResumeIt v1.0.1 📝
 
 > **AI-Driven Resume Generator for Software Engineers**  
 > Open Source · Privacy-First · Zero Backend
@@ -32,6 +32,8 @@ ResumeIt is a **client-side, AI-powered resume generator** built specifically fo
 | Feature | Description |
 |---|---|
 | 🎯 **JD-Tailored Generation** | Paste any job description → get a resume optimized for it |
+| 📄 **1- or 2-Page Target** | Choose a concise one-page resume or allow up to two pages of detail |
+| 🎛️ **Content Controls** | Choose included sections, highlight skills/languages, prioritise Vault entries, and add custom instructions |
 | 🗄️ **Memory Vault** | Persistent local DB of your experiences (IndexedDB) |
 | 🐙 **GitHub Integration** | Auto-fetches repos, languages, and activity signals |
 | 🧠 **AI Relevance Ranking** | Gemini scores each vault entry against the JD before writing |
@@ -39,6 +41,18 @@ ResumeIt is a **client-side, AI-powered resume generator** built specifically fo
 | 📂 **Resume Library** | Save and re-download past resumes |
 | 📥 **Resume Import** | Upload PDF/DOCX → AI extracts entries into your Vault |
 | 🔒 **Zero-Tracking** | API keys and data stored only in browser localStorage/IndexedDB |
+
+### Resume customisation
+
+Before generation, use **Resume preferences** to control the output without editing the job description:
+
+- Select a **1-page** concise target or permit up to **2 pages** for more detail.
+- Include only the sections you want: summary, skills and languages, experience, projects, education, and certifications.
+- Add skills or languages that should be emphasised in the generated content.
+- Prioritise specific Memory Vault entries, or let ResumeIt rank the full Vault automatically.
+- Add any other instructions, such as focusing on a particular project or leadership impact.
+
+These choices are used in the AI prompt, applied to the live preview and PDF export, and saved with each resume in your library.
 
 ---
 
@@ -78,7 +92,7 @@ resumeit/
     ├── github.js           # GitHub REST API integration
     ├── llm.js              # Gemini API orchestration
     ├── parser.js           # Client-side PDF/DOCX parser
-    └── exporter.js         # ATS-compliant PDF export
+    └── exporter.js         # ATS-compliant PDF export and page/section controls
 ```
 
 **Tech stack:** Vanilla HTML + CSS + JavaScript ES Modules. No framework, no build step, no bundler.
@@ -125,8 +139,8 @@ This project uses **semantic versioning** (`MAJOR.MINOR.PATCH`).
 
 To create a new release:
 ```bash
-git tag v1.1.0
-git push origin v1.1.0
+git tag v1.0.1
+git push origin v1.0.1
 # GitHub Actions will automatically create a GitHub Release with changelog
 ```
 

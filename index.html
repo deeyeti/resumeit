@@ -142,7 +142,7 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
       <span class="logo-wordmark">ResumeIt</span>
-      <span class="logo-tagline">v1.1 · Open Source</span>
+      <span class="logo-tagline">v1.0.1 · Open Source</span>
     </div>
 
     <nav class="sidebar-nav" role="navigation">
@@ -331,6 +331,64 @@
                     style="min-height:360px;font-size:var(--text-sm);line-height:var(--leading-relaxed);"
                     placeholder="Paste the complete job description here — include requirements, responsibilities, and tech stack for the best results."></textarea>
 
+                  <div class="resume-preferences" aria-labelledby="resume-preferences-title">
+                    <div class="resume-preferences-header">
+                      <div>
+                        <div class="eyebrow" id="resume-preferences-title">Resume preferences</div>
+                        <p>Choose the length and content you want the AI to prioritise.</p>
+                      </div>
+                      <span class="preference-required">Optional customisation</span>
+                    </div>
+
+                    <fieldset class="preference-fieldset">
+                      <legend>Target length</legend>
+                      <div class="segmented-control" role="radiogroup" aria-label="Target resume length">
+                        <label class="segment-option">
+                          <input type="radio" name="page-count" value="1" checked />
+                          <span>1 page <small>Concise</small></span>
+                        </label>
+                        <label class="segment-option">
+                          <input type="radio" name="page-count" value="2" />
+                          <span>2 pages <small>More detail</small></span>
+                        </label>
+                      </div>
+                    </fieldset>
+
+                    <fieldset class="preference-fieldset">
+                      <legend>Sections to include</legend>
+                      <div class="section-options">
+                        <label><input type="checkbox" data-resume-section="summary" checked /> Summary</label>
+                        <label><input type="checkbox" data-resume-section="skills" checked /> Skills &amp; languages</label>
+                        <label><input type="checkbox" data-resume-section="experience" checked /> Experience</label>
+                        <label><input type="checkbox" data-resume-section="projects" checked /> Projects</label>
+                        <label><input type="checkbox" data-resume-section="education" checked /> Education</label>
+                        <label><input type="checkbox" data-resume-section="certifications" checked /> Certifications</label>
+                      </div>
+                    </fieldset>
+
+                    <div class="preference-grid">
+                      <div class="preference-fieldset">
+                        <label class="form-label" for="highlighted-skill-input">Skills and languages to highlight</label>
+                        <div class="tag-input-row">
+                          <input id="highlighted-skill-input" class="form-input" type="text" placeholder="e.g. TypeScript, AWS" />
+                          <button class="btn btn-outline btn-sm" type="button" onclick="addHighlightedSkill()">Add</button>
+                        </div>
+                        <div class="selected-tags" id="highlighted-skills-tags" aria-live="polite"></div>
+                      </div>
+
+                      <div class="preference-fieldset">
+                        <label class="form-label" for="resume-instructions">Anything else to prioritise?</label>
+                        <textarea id="resume-instructions" class="form-textarea preference-textarea" placeholder="e.g. Lead with backend projects and make the leadership impact prominent."></textarea>
+                      </div>
+                    </div>
+
+                    <details class="vault-preferences">
+                      <summary>Prioritise specific experiences or projects from your Vault</summary>
+                      <p>Select entries only when you want them considered ahead of automatic relevance ranking.</p>
+                      <div id="vault-preferences-list" class="vault-preferences-list"></div>
+                    </details>
+                  </div>
+
                   <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;">
                     <p style="font-size:var(--text-xs);color:var(--text-muted);margin:0;">The more detail you include, the better the tailoring.</p>
                     <button class="btn btn-primary" onclick="startGeneration()" id="start-gen-btn">
@@ -432,6 +490,7 @@
                   <button class="btn btn-outline full-width" onclick="saveCurrentResume()">
                     Save to library
                   </button>
+                  <div id="resume-preferences-summary" class="resume-preferences-summary"></div>
                   <button class="btn-text full-width" style="text-align:center;margin-top:4px;" onclick="navigate('generate');initGenerator();">
                     ← Generate another
                   </button>

@@ -4,10 +4,18 @@
  * Produces ATS-compliant, single-column PDF output.
  */
 
+function shouldIncludeSection(options, section) {
+  return options?.sections?.[section] !== false;
+}
+
+function getPageLimit(options) {
+  return Number(options?.pageCount) === 2 ? 2 : 1;
+}
+
 /**
  * Convert resume JSON data to clean ATS HTML string
  */
-export function resumeToHTML(data) {
+export function resumeToHTML(data, options = {}) {
   const s = (value) => value === null || value === undefined
     ? ''
     : String(value)
@@ -17,7 +25,7 @@ export function resumeToHTML(data) {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
 
-  const skillsSection = data.skills
+  const skillsSection = shouldIncludeSection(options, 'skills') && data.skills
     ? `<h2>Technical Skills</h2>
        ${data.skills.languages?.length ? `<p><strong>Languages:</strong> ${data.skills.languages.map(s).join(', ')}</p>` : ''}
        ${data.skills.frameworks?.length ? `<p><strong>Frameworks:</strong> ${data.skills.frameworks.map(s).join(', ')}</p>` : ''}
@@ -25,7 +33,7 @@ export function resumeToHTML(data) {
        ${data.skills.other?.length ? `<p><strong>Other:</strong> ${data.skills.other.map(s).join(', ')}</p>` : ''}`
     : '';
 
-  const experienceSection = data.experience?.length
+  const experienceSection = shouldIncludeSection(options, 'experience') && data.experience?.length
     ? `<h2>Experience</h2>
        ${data.experience.map(exp => `
          <div class="entry">
@@ -37,7 +45,7 @@ export function resumeToHTML(data) {
          </div>`).join('')}`
     : '';
 
-  const projectsSection = data.projects?.length
+  const projectsSection = shouldIncludeSection(options, 'projects') && data.projects?.length
     ? `<h2>Projects</h2>
        ${data.projects.map(proj => `
          <div class="entry">
@@ -49,7 +57,7 @@ export function resumeToHTML(data) {
          </div>`).join('')}`
     : '';
 
-  const educationSection = data.education?.length
+  const educationSection = shouldIncludeSection(options, 'education') && data.education?.length
     ? `<h2>Education</h2>
        ${data.education.map(edu => `
          <div class="entry">
@@ -60,7 +68,7 @@ export function resumeToHTML(data) {
          </div>`).join('')}`
     : '';
 
-  const certsSection = data.certifications?.length
+  const certsSection = shouldIncludeSection(options, 'certifications') && data.certifications?.length
     ? `<h2>Certifications</h2>
        <ul>${data.certifications.map(c => `<li>${s(typeof c === 'string' ? c : c.name)}</li>`).join('')}</ul>`
     : '';
@@ -136,7 +144,7 @@ export function resumeToHTML(data) {
     </div>
   </div>
   <hr>
-  ${data.summary ? `<section><p class="summary">${s(data.summary)}</p></section>` : ''}
+   ${shouldIncludeSection(options, 'summary') && data.summary ? `<section><p class="summary">${s(data.summary)}</p></section>` : ''}
   ${skillsSection ? `<section>${skillsSection}</section>` : ''}
   ${experienceSection ? `<section>${experienceSection}</section>` : ''}
   ${projectsSection ? `<section>${projectsSection}</section>` : ''}
@@ -149,8 +157,8 @@ export function resumeToHTML(data) {
 /**
  * Render resume HTML into a preview container
  */
-export function renderResumePreview(container, data) {
-  const html = resumeToHTML(data);
+export function renderResumePreview(container, data, options = {}) {
+  const html = resumeToHTML(data, options);
   const iframe = document.createElement('iframe');
   iframe.style.cssText = 'width:100%; height:100%; border:none; min-height:600px;';
   container.innerHTML = '';
@@ -167,7 +175,7 @@ export function renderResumePreview(container, data) {
 /**
  * Export resume to PDF using jsPDF + html2canvas
  */
-export async function exportToPDF(resumeData, filename = 'resume.pdf') {
+export async function exportToPDF(resumeData, filename = 'resume.pdf', options = {}) {
   if (typeof window.jspdf === 'undefined' && typeof window.jsPDF === 'undefined') {
     throw new Error('jsPDF library not loaded.');
   }
@@ -176,7 +184,7 @@ export async function exportToPDF(resumeData, filename = 'resume.pdf') {
   }
 
   const { jsPDF } = window.jspdf || window;
-  const html = resumeToHTML(resumeData);
+  const html = resumeToHTML(resumeData, options);
 
   // Create hidden iframe to render the HTML
   const iframe = document.createElement('iframe');
@@ -214,15 +222,20 @@ export async function exportToPDF(resumeData, filename = 'resume.pdf') {
 
   const pageWidth = 210; // A4 width in mm
   const pageHeight = 297; // A4 height in mm
-  const imgWidth = pageWidth;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+  const naturalImgWidth = pageWidth;
+  const naturalImgHeight = (canvas.height * naturalImgWidth) / canvas.width;
+  const maxHeight = pageHeight * getPageLimit(options);
+  const fitScale = naturalImgHeight > maxHeight ? maxHeight / naturalImgHeight : 1;
+  const imgWidth = naturalImgWidth * fitScale;
+  const imgHeight = naturalImgHeight * fitScale;
+  const x = (pageWidth - imgWidth) / 2;
 
   let y = 0;
   let pageNum = 0;
 
-  while (y < imgHeight) {
+  while (y < imgHeight - 0.01) {
     if (pageNum > 0) pdf.addPage();
-    pdf.addImage(imgData, 'PNG', 0, -y, imgWidth, imgHeight);
+    pdf.addImage(imgData, 'PNG', x, -y, imgWidth, imgHeight);
     y += pageHeight;
     pageNum++;
   }

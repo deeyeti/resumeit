@@ -25,8 +25,26 @@ Return ONLY a valid JSON array of objects with this exact structure:
 Score 100 = perfect match, 0 = completely irrelevant. Be strict and precise.`;
 }
 
-function buildResumePrompt(jobDescription, rankedEntries, githubData, userProfile) {
+function buildResumePrompt(jobDescription, rankedEntries, githubData, userProfile, preferences = {}) {
   const topEntries = rankedEntries.slice(0, 5);
+  const pageCount = Number(preferences.pageCount) === 2 ? 2 : 1;
+  const sections = preferences.sections || {};
+  const sectionNames = {
+    summary: 'Summary / Objective',
+    skills: 'Technical Skills',
+    experience: 'Experience',
+    projects: 'Projects',
+    education: 'Education',
+    certifications: 'Certifications',
+  };
+  const includedSections = Object.entries(sectionNames)
+    .filter(([key]) => sections[key] !== false)
+    .map(([, name]) => name);
+  const excludedSections = Object.entries(sectionNames)
+    .filter(([key]) => sections[key] === false)
+    .map(([, name]) => name);
+  const highlightedSkills = (preferences.highlightedSkills || []).filter(Boolean);
+  const additionalInstructions = String(preferences.additionalInstructions || '').trim();
 
   return `You are an elite technical resume writer. Generate a complete, ATS-optimized resume for a software engineer.
 
@@ -37,7 +55,11 @@ STRICT RULES:
 - Tailor ALL content to the job description below
 - Avoid complex formatting (no tables, no columns)
 - Keep bullet points concise (under 120 characters each)
-- Max 2 pages worth of content
+- Target a ${pageCount}-page resume. ${pageCount === 1
+    ? 'Be ruthlessly concise: include only the strongest, most relevant material and keep the result to one A4 page.'
+    : 'Use the available space deliberately, but do not exceed two A4 pages.'}
+- Do not invent employers, projects, degrees, certifications, metrics, or skills.
+- For sections the user excluded, return an empty string, empty array, or empty skills object as appropriate.
 
 TARGET JOB DESCRIPTION:
 ${jobDescription}
@@ -56,6 +78,12 @@ GITHUB SIGNALS:
 
 SELECTED EXPERIENCES (ordered by relevance to JD):
 ${JSON.stringify(topEntries, null, 2)}
+
+USER CONTENT PREFERENCES:
+- Include these sections: ${includedSections.join(', ') || 'None'}
+- Exclude these sections: ${excludedSections.join(', ') || 'None'}
+- Skills and languages to highlight: ${highlightedSkills.join(', ') || 'No additional preferences'}
+- Additional instructions: ${additionalInstructions || 'None'}
 
 Return this EXACT JSON structure:
 {
@@ -167,8 +195,8 @@ export async function rankVaultEntries(apiKey, jobDescription, vaultEntries) {
     .sort((a, b) => b.relevanceScore - a.relevanceScore);
 }
 
-export async function generateResume(apiKey, jobDescription, rankedEntries, githubData, userProfile) {
-  const prompt = buildResumePrompt(jobDescription, rankedEntries, githubData, userProfile);
+export async function generateResume(apiKey, jobDescription, rankedEntries, githubData, userProfile, preferences = {}) {
+  const prompt = buildResumePrompt(jobDescription, rankedEntries, githubData, userProfile, preferences);
   return callGemini(apiKey, prompt);
 }
 
