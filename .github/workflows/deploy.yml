@@ -1,0 +1,59 @@
+name: CD — Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]      # Auto-deploy on every push to main
+  release:
+    types: [published]    # Also deploy when a release is published
+  workflow_dispatch:      # Allow manual trigger
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inject version into app
+        run: |
+          VERSION=$(git describe --tags --always --abbrev=7 2>/dev/null || echo "dev")
+          DEPLOY_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo "Injecting version: $VERSION at $DEPLOY_TIME"
+          # Replace version placeholder in index.html if present
+          sed -i "s/v1\.1 · Open Source/v${VERSION}/g" index.html || true
+          # Write a version.json file for the auto-update checker
+          cat > version.json << EOF
+          {
+            "version": "${VERSION}",
+            "deployedAt": "${DEPLOY_TIME}",
+            "commit": "${GITHUB_SHA}"
+          }
+          EOF
+          echo "Generated version.json:"
+          cat version.json
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'     # Deploy the entire project root
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

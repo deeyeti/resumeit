@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ResumeIt — AI-Driven Resume Generator for Software Engineers</title>
+  <meta name="description" content="ResumeIt is an open-source, AI-powered resume generator built for software engineers. Paste a job description and get a tailored, ATS-optimized resume in seconds using Gemini AI and your GitHub profile." />
+  <meta name="keywords" content="resume builder, AI resume, ATS resume, software engineer resume, Gemini AI, GitHub resume" />
+  <meta property="og:title" content="ResumeIt — AI Resume Generator" />
+  <meta property="og:description" content="Generate ATS-optimized resumes tailored to any job description using your Gemini API key and GitHub profile." />
+  <meta name="theme-color" content="#6c63ff" />
+
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- CDN Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <script>
+    // Configure pdf.js worker
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
+</head>
+<body>
+
+<!-- ===== TOAST CONTAINER ===== -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- ===== ONBOARDING ===== -->
+<div id="onboarding" class="onboarding-page d-none">
+  <div class="onboarding-container animate-fade-in-up">
+
+    <div class="onboarding-logo">
+      <div class="onboarding-logo-icon">📝</div>
+      <div class="onboarding-logo-text">ResumeIt</div>
+      <div class="onboarding-logo-tagline">AI-Driven Resume Generator for Software Engineers</div>
+    </div>
+
+    <div class="onboarding-card">
+      <div class="onboarding-steps">
+        <div class="onboarding-step-dot active"></div>
+        <div class="onboarding-step-dot"></div>
+        <div class="onboarding-step-dot"></div>
+      </div>
+
+      <!-- Step 0: API Key + Name -->
+      <div class="onboarding-step active" id="ob-step-0">
+        <div class="onboarding-step-title">Set up your workspace 🔑</div>
+        <div class="onboarding-step-desc">ResumeIt uses your own Gemini API key. Your data never leaves your device.</div>
+
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div class="form-group">
+            <label class="form-label">Your Name <span class="form-required">*</span></label>
+            <input id="ob-name" class="form-input" type="text" placeholder="Jane Doe" autocomplete="name" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input id="ob-email" class="form-input" type="email" placeholder="jane@example.com" autocomplete="email" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Gemini API Key <span class="form-required">*</span></label>
+            <div class="api-key-field">
+              <input id="ob-api-key" class="form-input" type="password" placeholder="AIzaSy..." autocomplete="off" />
+              <span class="api-key-toggle" onclick="toggleApiKeyVisibility('ob-api-key')">👁️</span>
+            </div>
+            <div class="form-hint">
+              Get your free key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a>. Stored only in your browser's localStorage.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 1: GitHub + Social -->
+      <div class="onboarding-step" id="ob-step-1">
+        <div class="onboarding-step-title">Connect your profiles 🔗</div>
+        <div class="onboarding-step-desc">Link GitHub to automatically include your repos and language stats in resumes.</div>
+
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div class="form-group">
+            <label class="form-label">GitHub Username</label>
+            <div style="position:relative;">
+              <input id="ob-github" class="form-input" type="text" placeholder="octocat" style="padding-left:36px;" />
+              <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);">🐙</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">LinkedIn Profile URL</label>
+            <input id="ob-linkedin" class="form-input" type="text" placeholder="linkedin.com/in/yourname" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Location</label>
+            <input id="ob-location" class="form-input" type="text" placeholder="San Francisco, CA" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Resume Upload -->
+      <div class="onboarding-step" id="ob-step-2">
+        <div class="onboarding-step-title">Seed your Memory Vault 📂</div>
+        <div class="onboarding-step-desc">Upload an existing resume (PDF or DOCX) to automatically extract your experiences into the Memory Vault. You can also add entries manually later.</div>
+
+        <div class="upload-area" id="ob-upload-area">
+          <input type="file" id="ob-resume-upload" accept=".pdf,.docx,.txt" />
+          <div class="upload-area-icon">📄</div>
+          <div class="upload-area-text">Drop your resume here or click to upload</div>
+          <div class="upload-area-hint">Supports PDF, DOCX, TXT • Processed locally with Gemini AI</div>
+          <div id="ob-upload-filename" style="margin-top:8px;font-size:0.8rem;color:var(--accent-emerald);font-weight:600;"></div>
+        </div>
+
+        <div style="margin-top:16px;padding:12px;background:rgba(108,99,255,0.06);border:1px solid rgba(108,99,255,0.15);border-radius:var(--radius-md);">
+          <div style="font-size:0.8rem;color:var(--text-secondary);">
+            🔒 <strong>Privacy first:</strong> Your resume is processed entirely client-side. No files are uploaded to any server.
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <div class="onboarding-nav">
+        <button id="ob-back" class="btn btn-secondary" style="display:none;">← Back</button>
+        <button id="ob-skip" class="btn btn-ghost btn-sm" style="flex:0;">Skip</button>
+        <button id="ob-next" class="btn btn-primary">Continue →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MAIN APP ===== -->
+<div id="app" class="d-none">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar" role="navigation" aria-label="Main navigation">
+    <div class="sidebar-logo">
+      <div class="logo-icon">📝</div>
+      <div>
+        <div class="logo-text">ResumeIt</div>
+        <div class="logo-version">v1.1 · Open Source</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+
+      <div class="nav-item active" data-page="dashboard" id="nav-dashboard" role="menuitem" tabindex="0" aria-label="Dashboard">
+        <span class="nav-icon">🏠</span>
+        Dashboard
+      </div>
+
+      <div class="nav-item" data-page="generate" id="nav-generate" role="menuitem" tabindex="0" aria-label="Resume Generator">
+        <span class="nav-icon">✨</span>
+        Generator
+      </div>
+
+      <div class="nav-section-label">Data</div>
+
+      <div class="nav-item" data-page="vault" id="nav-vault" role="menuitem" tabindex="0" aria-label="Memory Vault">
+        <span class="nav-icon">🗄️</span>
+        Memory Vault
+        <span class="nav-badge">0</span>
+      </div>
+
+      <div class="nav-item" data-page="resumes" id="nav-resumes" role="menuitem" tabindex="0" aria-label="Saved Resumes">
+        <span class="nav-icon">📂</span>
+        Saved Resumes
+      </div>
+
+      <div class="nav-section-label">Account</div>
+
+      <div class="nav-item" data-page="settings" id="nav-settings" role="menuitem" tabindex="0" aria-label="Settings">
+        <span class="nav-icon">⚙️</span>
+        Settings
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div style="font-size:0.72rem;color:var(--text-muted);text-align:center;line-height:1.6;">
+        Open Source · MIT License<br/>
+        <a href="https://github.com" target="_blank" rel="noopener" style="color:var(--accent-secondary);">View on GitHub</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div>
+        <div id="topbar-title" class="topbar-title">Dashboard</div>
+        <div id="topbar-subtitle" class="topbar-subtitle">Overview of your resume activity</div>
+      </div>
+      <div class="topbar-spacer"></div>
+      <div class="topbar-actions">
+        <button class="btn btn-primary btn-sm" onclick="navigate('generate')" id="topbar-generate-btn">
+          ✨ New Resume
+        </button>
+      </div>
+    </header>
+
+    <!-- ===== DASHBOARD PAGE ===== -->
+    <section class="page active" id="page-dashboard" aria-label="Dashboard">
+      <div class="page-content">
+
+        <!-- Welcome -->
+        <div class="mb-24">
+          <h1 style="font-size:1.75rem;margin-bottom:4px;">Welcome back 👋</h1>
+          <p>Your AI-powered resume generator is ready. Paste a job description to get started.</p>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid mb-24">
+          <div class="stat-card">
+            <div class="stat-icon purple">🗄️</div>
+            <div class="stat-info">
+              <div class="stat-value text-accent" id="stat-vault">0</div>
+              <div class="stat-label">Vault Entries</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon emerald">📄</div>
+            <div class="stat-info">
+              <div class="stat-value" style="color:var(--accent-emerald);" id="stat-resumes">0</div>
+              <div class="stat-label">Resumes Generated</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon sky">🐙</div>
+            <div class="stat-info">
+              <div class="stat-value" style="color:var(--accent-sky);font-size:1rem;padding-top:6px;" id="stat-github">—</div>
+              <div class="stat-label">GitHub Handle</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vault Tip -->
+        <div id="vault-tip" class="d-none mb-24" style="background:rgba(108,99,255,0.07);border:1px solid rgba(108,99,255,0.2);border-radius:var(--radius-lg);padding:20px 24px;display:flex;align-items:center;gap:16px;">
+          <div style="font-size:2rem;">💡</div>
+          <div style="flex:1;">
+            <div style="font-weight:700;margin-bottom:4px;">Start building your Memory Vault</div>
+            <p style="font-size:0.875rem;margin:0;">Add your work experiences, projects, and achievements. The AI uses these to create tailored resumes.</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="navigate('vault')">Add Entries</button>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="grid-2 mb-24">
+          <div class="card" style="cursor:pointer;" onclick="navigate('generate')">
+            <div class="card-body" style="display:flex;align-items:center;gap:16px;">
+              <div style="width:52px;height:52px;background:var(--gradient-primary);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:var(--shadow-glow);">✨</div>
+              <div>
+                <div style="font-weight:700;">Generate Resume</div>
+                <p style="font-size:0.8rem;margin:0;">Paste a JD and get a tailored resume in seconds</p>
+              </div>
+              <div style="margin-left:auto;color:var(--text-muted);">→</div>
+            </div>
+          </div>
+          <div class="card" style="cursor:pointer;" onclick="navigate('vault')">
+            <div class="card-body" style="display:flex;align-items:center;gap:16px;">
+              <div style="width:52px;height:52px;background:rgba(16,217,160,0.12);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;font-size:24px;border:1px solid rgba(16,217,160,0.2);">🗄️</div>
+              <div>
+                <div style="font-weight:700;">Memory Vault</div>
+                <p style="font-size:0.8rem;margin:0;">Manage your experiences, projects & achievements</p>
+              </div>
+              <div style="margin-left:auto;color:var(--text-muted);">→</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Resumes -->
+        <div class="section-header">
+          <div>
+            <div class="section-title">Recent Resumes</div>
+            <div class="section-subtitle">Your latest generated resumes</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="navigate('resumes')">View All →</button>
+        </div>
+        <div id="recent-resumes" class="resume-list"></div>
+
+      </div>
+    </section>
+
+    <!-- ===== MEMORY VAULT PAGE ===== -->
+    <section class="page" id="page-vault" aria-label="Memory Vault">
+      <div class="page-content">
+
+        <div class="section-header mb-20">
+          <div>
+            <h2 style="font-size:1.3rem;margin-bottom:4px;">Memory Vault</h2>
+            <p style="margin:0;font-size:0.875rem;">Your master list of experiences and achievements. The AI selects the most relevant ones for each job.</p>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <div class="upload-area" style="padding:10px 16px;border-style:dashed;border-width:1px;position:relative;" title="Import from resume">
+              <input type="file" id="vault-upload-input" accept=".pdf,.docx,.txt" style="position:absolute;inset:0;opacity:0;cursor:pointer;" />
+              <span style="font-size:0.82rem;color:var(--text-secondary);">📄 Import Resume</span>
+            </div>
+            <button class="btn btn-primary" onclick="openVaultModal()" id="add-vault-entry-btn">
+              + Add Entry
+            </button>
+          </div>
+        </div>
+
+        <div id="vault-entries" style="display:flex;flex-direction:column;gap:14px;"></div>
+      </div>
+    </section>
+
+    <!-- ===== GENERATOR PAGE ===== -->
+    <section class="page" id="page-generate" aria-label="Resume Generator">
+      <div class="page-content">
+
+        <!-- Step Wizard -->
+        <div class="step-wizard mb-8">
+          <div class="step-item active" id="wizard-step-0">
+            <div class="step-number">1</div>
+            <div class="step-label">Job Description</div>
+          </div>
+          <div class="step-divider"></div>
+          <div class="step-item" id="wizard-step-1">
+            <div class="step-number">2</div>
+            <div class="step-label">GitHub Fetch</div>
+          </div>
+          <div class="step-divider"></div>
+          <div class="step-item" id="wizard-step-2">
+            <div class="step-number">3</div>
+            <div class="step-label">AI Ranking</div>
+          </div>
+          <div class="step-divider"></div>
+          <div class="step-item" id="wizard-step-3">
+            <div class="step-number">4</div>
+            <div class="step-label">Generating</div>
+          </div>
+          <div class="step-divider"></div>
+          <div class="step-item" id="wizard-step-4">
+            <div class="step-number">✓</div>
+            <div class="step-label">Preview & Export</div>
+          </div>
+        </div>
+
+        <div class="progress mb-20" style="height:3px;">
+          <div class="progress-bar" id="gen-progress-bar" style="width:0%;"></div>
+        </div>
+
+        <!-- Step 0: JD Input -->
+        <div class="gen-step active" id="gen-step-0">
+          <div class="generator-layout">
+            <div class="generator-panel" style="min-height:500px;">
+              <div class="panel-header">
+                <div class="panel-title">📋 Target Job Description</div>
+                <span class="badge badge-info">Step 1 of 4</span>
+              </div>
+              <div class="panel-body">
+                <p style="font-size:0.875rem;margin-bottom:14px;">Paste the full job description below. The more detail, the better tailored your resume will be.</p>
+                <textarea
+                  id="jd-input"
+                  class="form-textarea"
+                  style="min-height:340px; font-size:0.875rem; line-height:1.65;"
+                  placeholder="Paste the complete job description here...
+
+Example:
+Senior Software Engineer – Backend
+Requirements:
+• 5+ years of experience with Python or Go
+• Strong experience with distributed systems
+• Experience with Kubernetes and Docker
+• REST API design and microservices architecture..."
+                ></textarea>
+                <div class="mt-16" style="display:flex;align-items:center;justify-content:space-between;">
+                  <div style="font-size:0.78rem;color:var(--text-muted);">
+                    💡 Tip: Include the full requirements section for best results
+                  </div>
+                  <button class="btn btn-primary btn-lg" onclick="startGeneration()" id="start-gen-btn">
+                    ✨ Generate Resume
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:16px;">
+              <!-- Memory Vault summary -->
+              <div class="generator-panel">
+                <div class="panel-header">
+                  <div class="panel-title">🗄️ Memory Vault</div>
+                  <span class="badge badge-success" id="vault-count-badge"></span>
+                </div>
+                <div class="panel-body" style="max-height:200px;overflow-y:auto;">
+                  <div id="vault-summary-list" style="font-size:0.82rem;color:var(--text-secondary);display:flex;flex-direction:column;gap:6px;"></div>
+                </div>
+              </div>
+
+              <!-- Tips -->
+              <div style="background:rgba(108,99,255,0.06);border:1px solid rgba(108,99,255,0.15);border-radius:var(--radius-lg);padding:16px 20px;">
+                <div style="font-weight:700;margin-bottom:8px;font-size:0.875rem;">How it works</div>
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                  <div style="display:flex;gap:8px;font-size:0.8rem;color:var(--text-secondary);">
+                    <span>1️⃣</span><span>Fetches your latest GitHub activity</span>
+                  </div>
+                  <div style="display:flex;gap:8px;font-size:0.8rem;color:var(--text-secondary);">
+                    <span>2️⃣</span><span>AI ranks your Vault entries by relevance to the JD</span>
+                  </div>
+                  <div style="display:flex;gap:8px;font-size:0.8rem;color:var(--text-secondary);">
+                    <span>3️⃣</span><span>Gemini generates your tailored, ATS-optimized resume</span>
+                  </div>
+                  <div style="display:flex;gap:8px;font-size:0.8rem;color:var(--text-secondary);">
+                    <span>4️⃣</span><span>Review, edit, and export to PDF</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Steps 1-3: Processing -->
+        <div class="gen-step" id="gen-step-1" style="display:none;">
+        </div>
+        <div class="gen-step" id="gen-step-2" style="display:none;">
+        </div>
+        <div class="gen-step" id="gen-step-3" style="display:none;">
+        </div>
+
+        <!-- Steps 1-3 share a processing panel (shown during steps 1,2,3) -->
+        <div id="gen-processing-panel" class="d-none">
+          <div class="generator-layout">
+            <div class="generator-panel">
+              <div class="panel-header">
+                <div class="panel-title">⚙️ Processing</div>
+                <span class="badge badge-warning">In Progress</span>
+              </div>
+              <div class="panel-body">
+                <div id="gen-status" style="display:flex;align-items:flex-start;gap:14px;padding:20px;background:rgba(108,99,255,0.05);border-radius:var(--radius-md);border:1px solid rgba(108,99,255,0.12);">
+                  <div id="gen-status-icon" style="font-size:1.5rem;">⚙️</div>
+                  <div>
+                    <div id="gen-status-text" style="font-weight:600;font-size:0.9rem;">Starting...</div>
+                    <div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px;">This may take 15-30 seconds</div>
+                  </div>
+                </div>
+
+                <!-- Ranked entries preview -->
+                <div class="mt-20" id="ranked-entries-wrapper" style="display:none;">
+                  <div class="section-title" style="font-size:0.85rem;margin-bottom:10px;">🧠 Vault Relevance Ranking</div>
+                  <div id="ranked-entries-list"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="generator-panel">
+              <div class="panel-header">
+                <div class="panel-title">🐙 GitHub Signals</div>
+              </div>
+              <div class="panel-body" id="github-stats-panel">
+                <div class="loading-state" style="padding:32px;">
+                  <div class="spinner spinner-lg"></div>
+                  <p>Fetching GitHub profile...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4: Preview & Export -->
+        <div class="gen-step" id="gen-step-4" style="display:none;">
+          <div class="generator-layout" style="align-items:flex-start;">
+
+            <div class="generator-panel" style="min-height:600px;">
+              <div class="panel-header">
+                <div class="panel-title">📄 Resume Preview</div>
+                <div style="display:flex;gap:8px;">
+                  <button class="btn btn-sm btn-secondary" onclick="saveCurrentResume()" id="save-resume-btn">💾 Save</button>
+                  <button class="btn btn-sm btn-emerald" onclick="exportCurrentResume()" id="export-pdf-btn">⬇️ Export PDF</button>
+                </div>
+              </div>
+              <div class="panel-body" style="padding:12px;">
+                <div id="resume-preview-container" style="height:600px;overflow-y:auto;border-radius:var(--radius-md);background:#fff;"></div>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:16px;">
+
+              <!-- Actions -->
+              <div class="generator-panel">
+                <div class="panel-header">
+                  <div class="panel-title">🎯 Actions</div>
+                </div>
+                <div class="panel-body" style="display:flex;flex-direction:column;gap:10px;">
+                  <button class="btn btn-primary full-width" onclick="exportCurrentResume()" id="export-pdf-btn-2">⬇️ Download PDF</button>
+                  <button class="btn btn-secondary full-width" onclick="saveCurrentResume()">💾 Save to Library</button>
+                  <button class="btn btn-ghost full-width" onclick="navigate('generate');initGenerator();">🔄 Generate Another</button>
+                </div>
+              </div>
+
+              <!-- ATS Score Guidance -->
+              <div style="background:rgba(16,217,160,0.06);border:1px solid rgba(16,217,160,0.15);border-radius:var(--radius-lg);padding:16px 20px;">
+                <div style="font-weight:700;margin-bottom:8px;font-size:0.875rem;color:var(--accent-emerald);">✅ ATS Compliance</div>
+                <div style="font-size:0.8rem;color:var(--text-secondary);display:flex;flex-direction:column;gap:6px;">
+                  <div>✓ Single-column layout</div>
+                  <div>✓ No tables or graphics</div>
+                  <div>✓ Standard section headings</div>
+                  <div>✓ Keyword-optimized content</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===== SAVED RESUMES PAGE ===== -->
+    <section class="page" id="page-resumes" aria-label="Saved Resumes">
+      <div class="page-content">
+        <div class="section-header mb-20">
+          <div>
+            <h2 style="font-size:1.3rem;margin-bottom:4px;">Saved Resumes</h2>
+            <p style="margin:0;font-size:0.875rem;">All your previously generated resumes. Download or view any time.</p>
+          </div>
+          <button class="btn btn-primary" onclick="navigate('generate')">✨ New Resume</button>
+        </div>
+        <div id="saved-resumes-list" class="resume-list"></div>
+      </div>
+    </section>
+
+    <!-- ===== SETTINGS PAGE ===== -->
+    <section class="page" id="page-settings" aria-label="Settings">
+      <div class="page-content">
+
+        <div class="mb-24">
+          <h2 style="font-size:1.3rem;margin-bottom:4px;">Settings</h2>
+          <p style="margin:0;font-size:0.875rem;">Configure your profile, API key, and preferences.</p>
+        </div>
+
+        <!-- Profile Settings -->
+        <div class="settings-section mb-20">
+          <div class="settings-section-header">
+            <span>👤</span>
+            <div class="settings-section-title">Profile</div>
+          </div>
+          <div class="settings-section-body">
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label">Full Name</label>
+                <input id="set-name" class="form-input" type="text" placeholder="Jane Doe" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <input id="set-email" class="form-input" type="email" placeholder="jane@example.com" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">LinkedIn URL</label>
+                <input id="set-linkedin" class="form-input" type="text" placeholder="linkedin.com/in/yourname" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Location</label>
+                <input id="set-location" class="form-input" type="text" placeholder="San Francisco, CA" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- API Configuration -->
+        <div class="settings-section mb-20">
+          <div class="settings-section-header">
+            <span>🔑</span>
+            <div class="settings-section-title">API Configuration</div>
+          </div>
+          <div class="settings-section-body">
+            <div class="form-group">
+              <label class="form-label">GitHub Username</label>
+              <div style="position:relative;">
+                <input id="set-github" class="form-input" type="text" placeholder="octocat" style="padding-left:36px;" />
+                <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);">🐙</span>
+              </div>
+              <div class="form-hint">Used to fetch your repos, languages, and activity for resume content.</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Gemini API Key</label>
+              <div style="display:flex;gap:10px;">
+                <div class="api-key-field" style="flex:1;">
+                  <input id="set-api-key" class="form-input" type="password" placeholder="AIzaSy..." />
+                  <span class="api-key-toggle" onclick="toggleApiKeyVisibility('set-api-key')">👁️</span>
+                </div>
+                <button class="btn btn-secondary" id="validate-key-btn" onclick="validateApiKeyFromSettings()">✓ Validate Key</button>
+              </div>
+              <div class="form-hint">
+                Stored only in your browser's localStorage. Never sent to third-party servers.
+                Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a>.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-bottom:32px;">
+          <button class="btn btn-primary" onclick="saveSettingsForm()" id="save-settings-btn">💾 Save Settings</button>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="settings-section danger-zone">
+          <div class="settings-section-header">
+            <span>⚠️</span>
+            <div class="settings-section-title" style="color:var(--accent-rose);">Danger Zone</div>
+          </div>
+          <div class="settings-section-body">
+            <div class="settings-row">
+              <div>
+                <div class="settings-row-label">Clear All Data</div>
+                <div class="settings-row-desc">Permanently delete all Memory Vault entries, saved resumes, and settings. This cannot be undone.</div>
+              </div>
+              <button class="btn btn-danger" onclick="clearAllData()" id="clear-all-data-btn">🗑️ Clear All Data</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ===== VAULT ENTRY MODAL ===== -->
+<div class="modal-overlay" id="vault-modal" role="dialog" aria-modal="true" aria-labelledby="vault-modal-title">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="vault-modal-title">Add Experience</div>
+      <div class="modal-close" onclick="closeVaultModal()" aria-label="Close modal">✕</div>
+    </div>
+
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Title <span class="form-required">*</span></label>
+          <input id="vm-title" class="form-input" type="text" placeholder="Senior Backend Engineer" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Company / Context</label>
+          <input id="vm-context" class="form-input" type="text" placeholder="Acme Corp / Personal Project" />
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Date Range</label>
+          <input id="vm-date-range" class="form-input" type="text" placeholder="Jan 2022 – Present" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Type</label>
+          <select id="vm-type" class="form-select">
+            <option value="experience">💼 Work Experience</option>
+            <option value="project">🚀 Project</option>
+            <option value="education">🎓 Education</option>
+            <option value="other">📌 Other</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Tech Stack</label>
+        <div class="tags-input-container" id="vm-tech-tags-container" onclick="document.getElementById('vm-tech-input').focus()">
+          <div id="vm-tech-tags" style="display:contents;"></div>
+          <input id="vm-tech-input" type="text" placeholder="Type and press Enter or comma..." />
+        </div>
+        <div class="form-hint">Press Enter or comma to add each technology</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Impact Bullet Points</label>
+        <div style="display:flex;gap:8px;">
+          <input id="vm-bullet-input" class="form-input" type="text" placeholder="Reduced API latency by 40% by implementing Redis caching..." />
+          <button class="btn btn-secondary btn-icon" onclick="addBullet()" title="Add bullet">+</button>
+        </div>
+        <div class="form-hint">Press Enter to add. Use metrics and action verbs for best results.</div>
+        <div id="vm-bullets-list" style="display:flex;flex-direction:column;gap:6px;margin-top:8px;"></div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeVaultModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveVaultEntry()" id="vm-save-btn">💾 Save Entry</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CONFIRM DIALOG ===== -->
+<div class="modal-overlay confirm-modal" id="confirm-modal" role="alertdialog" aria-modal="true">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-body" style="align-items:center;text-align:center;gap:10px;">
+      <div class="confirm-title" id="confirm-title">Confirm Action</div>
+      <p class="confirm-desc" id="confirm-desc">Are you sure?</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeConfirm()" id="confirm-cancel-btn">Cancel</button>
+      <button class="btn btn-danger" onclick="executeConfirm()" id="confirm-ok-btn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
+
+<script>
+  // Generator step visibility controller - bridge between module and inline step panels
+  const _origShowStep = window.showGeneratorStep;
+
+  function syncGenSteps(step) {
+    document.querySelectorAll('.gen-step').forEach((el, i) => {
+      el.style.display = i === step ? 'block' : 'none';
+    });
+
+    const processingPanel = document.getElementById('gen-processing-panel');
+    if (step >= 1 && step <= 3) {
+      processingPanel.classList.remove('d-none');
+    } else {
+      processingPanel.classList.add('d-none');
+    }
+
+    // Ranked entries visibility
+    const rankedWrapper = document.getElementById('ranked-entries-wrapper');
+    if (step >= 2 && rankedWrapper) rankedWrapper.style.display = 'block';
+  }
+
+  // Patch showGeneratorStep after module loads
+  document.addEventListener('DOMContentLoaded', () => {
+    const origNav = window.navigate;
+    window.navigate = function(page) {
+      origNav && origNav(page);
+      if (page === 'generate') {
+        // populate vault summary in generator
+        setTimeout(() => {
+          const list = document.getElementById('vault-summary-list');
+          const badge = document.getElementById('vault-count-badge');
+          const entries = window._state?.vaultEntries || [];
+          if (badge) badge.textContent = `${entries.length} entries`;
+          if (list) {
+            list.innerHTML = entries.length
+              ? entries.slice(0, 6).map(e => `<div style="padding:4px 0;border-bottom:1px solid var(--border-subtle);display:flex;justify-content:space-between;"><span>${e.title}</span><span style="color:var(--text-muted);font-size:0.75rem;">${e.type || ''}</span></div>`).join('')
+                + (entries.length > 6 ? `<div style="color:var(--text-muted);font-size:0.75rem;margin-top:6px;">+${entries.length - 6} more</div>` : '')
+              : '<div style="color:var(--text-muted);">No entries yet — <a href="#" onclick="navigate(\'vault\')">add some</a></div>';
+          }
+        }, 100);
+      }
+    };
+  });
+</script>
+
+</body>
+</html>

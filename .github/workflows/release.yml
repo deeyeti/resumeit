@@ -1,0 +1,84 @@
+name: Release — Auto Changelog & GitHub Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'    # Triggers on tags like v1.0.0, v1.2.3, etc.
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # Full history needed for changelog generation
+
+      - name: Get previous tag
+        id: prev_tag
+        run: |
+          PREV=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
+          echo "prev_tag=$PREV" >> $GITHUB_OUTPUT
+          echo "Previous tag: $PREV"
+
+      - name: Generate changelog from commits
+        id: changelog
+        run: |
+          PREV="${{ steps.prev_tag.outputs.prev_tag }}"
+          TAG="${{ github.ref_name }}"
+          echo "Generating changelog from $PREV to $TAG"
+
+          # Generate grouped changelog using conventional commits
+          CHANGELOG=$(git log ${PREV}..HEAD --pretty=format:"%s|%h" | awk -F'|' '
+          BEGIN {
+            feat=""; fix=""; docs=""; refactor=""; chore=""; other=""
+          }
+          /^feat:/ { feat=feat"- "$1" ("$2")\n" }
+          /^fix:/  { fix=fix"- "$1" ("$2")\n" }
+          /^docs:/ { docs=docs"- "$1" ("$2")\n" }
+          /^refactor:/ { refactor=refactor"- "$1" ("$2")\n" }
+          /^chore:/ { chore=chore"- "$1" ("$2")\n" }
+          !/^(feat|fix|docs|refactor|chore):/ { other=other"- "$0"\n" }
+          END {
+            if (feat != "") print "### ✨ New Features\n"feat
+            if (fix != "") print "### 🐛 Bug Fixes\n"fix
+            if (docs != "") print "### 📚 Documentation\n"docs
+            if (refactor != "") print "### ♻️ Refactoring\n"refactor
+            if (chore != "") print "### 🔧 Chores\n"chore
+            if (other != "") print "### 📝 Other Changes\n"other
+          }')
+
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="No significant changes."
+          fi
+
+          # Write to file (multiline safe)
+          cat > /tmp/changelog.md << 'ENDOFCHANGELOG'
+          ## What's Changed
+          ENDOFCHANGELOG
+          echo "$CHANGELOG" >> /tmp/changelog.md
+          cat >> /tmp/changelog.md << ENDOFCHANGELOG
+
+          ---
+          **Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV}...${{ github.ref_name }}
+          ENDOFCHANGELOG
+
+          echo "Changelog:"
+          cat /tmp/changelog.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "ResumeIt ${{ github.ref_name }}"
+          body_path: /tmp/changelog.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') || contains(github.ref_name, '-rc') }}
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
