@@ -1700,4 +1700,10 @@ Object.assign(window, {
     });
   });
 
-})();
+})().catch((error) => {
+  // Never leave both application roots hidden when browser storage or a module fails.
+  console.error('ResumeIt could not finish initialization.', error);
+  document.getElementById('onboarding')?.classList.add('d-none');
+  document.getElementById('app')?.classList.remove('d-none');
+  showToast('ResumeIt started without saved workspace data. Reload to try again.', 'warning', 10000);
+});
