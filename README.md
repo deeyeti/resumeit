@@ -1,4 +1,4 @@
-# ResumeIt v1.1.0 📝
+# ResumeIt v1.2.0 📝
 
 > **AI-Driven Resume Generator for Software Engineers**  
 > Open Source · Privacy-First · Zero Backend
@@ -42,7 +42,8 @@ ResumeIt is a **client-side, AI-powered resume generator** built specifically fo
 | 🧠 **AI Relevance Ranking** | Gemini scores each vault entry against the JD before writing |
 | 📄 **PDF Export** | ATS-compliant, single-column PDF output |
 | 📂 **Resume Library** | Save and re-download past resumes |
-| 📥 **Resume Import** | Upload PDF/DOCX → AI extracts entries into your Vault |
+| 📥 **Resume & JD Upload** | Upload PDF/DOCX for your existing resume or job description — AI extracts context automatically |
+| ✉️ **AI Cover Letter** | Generate a tailored cover letter with tone options, hiring manager field, inline preview, copy & download |
 | 🔒 **Zero-Tracking** | API keys and data stored only in browser localStorage/IndexedDB |
 
 ### Resume customisation and templates
@@ -57,7 +58,9 @@ Before generation, use **Resume preferences** to control the output without edit
 
 These choices are used in the AI prompt, applied to the live preview and PDF export, and saved with each resume in your library.
 
-Version 1.1 adds a **Templates** workspace where you can select a global default design, change its accent color and font pairing, and preview all six layouts with sample resume data. At the generator preview step, templates switch instantly without another Gemini request. Your selected template, color, font pairing, and section visibility are preserved with saved resumes.
+Version 1.1 added a **Templates** workspace where you can select a global default design, change its accent color and font pairing, and preview all six layouts with sample resume data. At the generator preview step, templates switch instantly without another Gemini request.
+
+Version 1.2 adds **AI Cover Letter generation** and **file upload** support for both job descriptions and existing resumes, along with a significantly enhanced ATS-maximization prompt engine.
 
 The Compact template uses a two-column presentation to fit dense technical profiles. It includes an in-app ATS caution because older applicant tracking systems may read columns less reliably.
 
@@ -136,8 +139,6 @@ Generating one resume typically uses ~1,500–3,000 tokens. You can generate **h
 | `Rate limit exceeded` | You've hit the free-tier limit. Wait 60 seconds or check [quota usage](https://console.cloud.google.com/apis/api/generativelanguage.googleapis.com/quotas) |
 | Key not saved after refresh | Your browser may be blocking `localStorage`. Try disabling private/incognito mode |
 
-
-
 ---
 
 ## 🏗️ Architecture
@@ -208,8 +209,8 @@ This project uses **semantic versioning** (`MAJOR.MINOR.PATCH`).
 
 To create a new release:
 ```bash
-git tag v1.1.0
-git push origin v1.1.0
+git tag v1.2.0
+git push origin v1.2.0
 # GitHub Actions will automatically create a GitHub Release with changelog
 ```
 
