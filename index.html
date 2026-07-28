@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
@@ -658,9 +658,25 @@
                 </div>
               </div>
 
+              <!-- Fit Score Panel -->
+              <div class="gen-panel" id="fit-score-panel">
+                <div class="gen-panel-header">
+                  <span class="gen-panel-title">Fit Score</span>
+                  <span style="font-size:var(--text-xs);color:var(--text-muted);">1.1 – 9.9</span>
+                </div>
+                <div class="gen-panel-body" style="display:flex;flex-direction:column;gap:10px;">
+                  <p style="font-size:var(--text-xs);color:var(--text-secondary);line-height:1.6;margin:0;">See how well your experience matches this role — scored by Gemini across four dimensions.</p>
+                  <button class="btn btn-primary full-width" id="fit-score-btn" onclick="scoreFitUI()">
+                    ⚡ Check My Fit
+                  </button>
+                  <div id="fit-score-output" style="display:none;"></div>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
+
 
       </div>
     </section>

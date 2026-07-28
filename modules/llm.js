@@ -322,3 +322,121 @@ Return ONLY this exact JSON structure (no markdown, no code blocks):
   }
   return result;
 }
+
+/**
+ * scoreFitForJD — Scores how well the candidate fits a given job description.
+ *
+ * Returns a score on a 1.1–9.9 scale (never a round integer) along with
+ * dimension-level sub-scores and a short verdict + improvement tip.
+ *
+ * @param {string} apiKey           - Gemini API key
+ * @param {string} jobDescription   - Full job description text
+ * @param {Array}  rankedEntries    - Vault entries (already ranked / all)
+ * @param {object} githubData       - GitHub signals from github.js
+ * @param {object} userProfile      - { name, email, github, linkedin, location }
+ * @param {string} existingResumeText - Raw text of candidate's uploaded resume (optional)
+ * @returns {Promise<{
+ *   score: number,          // 1.1–9.9
+ *   verdict: string,        // one punchy sentence
+ *   dimensions: {
+ *     skillsMatch:      { score: number, note: string },
+ *     experienceDepth:  { score: number, note: string },
+ *     keywordAlignment: { score: number, note: string },
+ *     roleFit:          { score: number, note: string }
+ *   },
+ *   topStrengths: string[], // 2–3 bullet strengths
+ *   topGaps:      string[], // 2–3 bullet gaps / areas to improve
+ * }>}
+ */
+export async function scoreFitForJD(apiKey, jobDescription, rankedEntries = [], githubData = null, userProfile = {}, existingResumeText = '') {
+  const entrySnippets = rankedEntries.slice(0, 8).map(e => ({
+    title: e.title,
+    context: e.context,
+    techStack: e.techStack,
+    bullets: (e.bulletPoints || []).slice(0, 3),
+    relevanceScore: e.relevanceScore,
+  }));
+
+  const prompt = `You are a brutally honest senior technical recruiter with 15 years of experience screening software engineering candidates.
+
+Your task: Evaluate how strong a fit this candidate is for the job description below, and return a precise JSON score.
+
+═══════════════════════════════════════════
+SCORING RULES
+═══════════════════════════════════════════
+- Overall score must be between 1.1 and 9.9 (NEVER a round integer like 5.0 or 7.0 — always one decimal like 6.3 or 8.1)
+- Dimension scores also between 1.1 and 9.9
+- Be calibrated: a score of 9+ means near-perfect fit. 7–8.9 = strong. 5–6.9 = moderate. Below 5 = weak.
+- Be honest. Do not inflate scores. If the candidate lacks a core required skill, that MUST drag down the score.
+- topStrengths: 2–3 specific things the candidate has that directly match the JD
+- topGaps: 2–3 specific things the JD requires that the candidate lacks or appears weak in
+- verdict: one punchy sentence (max 20 words) summarising the overall fit — be direct, not diplomatic
+
+DIMENSIONS:
+1. skillsMatch       — How many of the JD's required/preferred technical skills appear in the candidate's vault/resume/GitHub
+2. experienceDepth   — Seniority and depth of experience relative to what the JD expects
+3. keywordAlignment  — How well the candidate's language, tools, and domain mirror the JD's terminology
+4. roleFit           — How aligned the candidate's career trajectory, project types, and stated goals are with this specific role
+
+═══════════════════════════════════════════
+JOB DESCRIPTION:
+${jobDescription.substring(0, 5000)}
+
+═══════════════════════════════════════════
+CANDIDATE DATA:
+
+Name: ${userProfile.name || 'Unknown'}
+GitHub: ${userProfile.github ? `github.com/${userProfile.github}` : 'Not provided'}
+
+GITHUB SIGNALS:
+- Public Repos: ${githubData?.user?.publicRepos || 0}
+- Top Languages: ${githubData?.languages?.slice(0, 6).map(l => `${l.lang} (${l.percent}%)`).join(', ') || 'N/A'}
+- Recent Activity: ${githubData?.activity?.recentCommits || 0} commits
+- Notable Repos: ${githubData?.topRepos?.slice(0, 3).map(r => `${r.name} (⭐${r.stars})`).join(', ') || 'N/A'}
+
+MEMORY VAULT ENTRIES (top relevant experiences):
+${JSON.stringify(entrySnippets, null, 2)}
+
+${existingResumeText ? `EXISTING RESUME TEXT (additional context):
+${existingResumeText.substring(0, 4000)}` : ''}
+
+═══════════════════════════════════════════
+Return ONLY this exact JSON (no markdown, no code blocks):
+{
+  "score": 6.7,
+  "verdict": "Solid mid-level backend engineer but missing the required Kubernetes and Go experience.",
+  "dimensions": {
+    "skillsMatch":      { "score": 7.2, "note": "Covers 6 of 9 required skills; missing Go and gRPC" },
+    "experienceDepth":  { "score": 6.1, "note": "3 years relevant experience vs 5+ requested" },
+    "keywordAlignment": { "score": 7.8, "note": "Strong overlap on AWS, CI/CD, and microservices terminology" },
+    "roleFit":          { "score": 5.9, "note": "Primarily frontend-focused; JD is 80% backend/infrastructure" }
+  },
+  "topStrengths": [
+    "Strong AWS and Docker proficiency matching JD's primary cloud stack",
+    "Demonstrated microservices architecture experience across 3 projects"
+  ],
+  "topGaps": [
+    "No Kubernetes experience — listed as required in JD",
+    "Go language absent from vault and GitHub — primary language for this role"
+  ]
+}`;
+
+  const result = await callGemini(apiKey, prompt);
+
+  // Validate and clamp the score
+  if (typeof result.score !== 'number' || !result.dimensions) {
+    throw new Error('Fit score returned an unexpected structure. Please try again.');
+  }
+
+  // Ensure score is in [1.1, 9.9] and has one decimal
+  result.score = Math.min(9.9, Math.max(1.1, Math.round(result.score * 10) / 10));
+
+  // Clamp dimension scores too
+  for (const dim of Object.values(result.dimensions)) {
+    if (typeof dim.score === 'number') {
+      dim.score = Math.min(9.9, Math.max(1.1, Math.round(dim.score * 10) / 10));
+    }
+  }
+
+  return result;
+}

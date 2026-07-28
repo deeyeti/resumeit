@@ -5,7 +5,7 @@
 
 import { initDB, getAllVaultEntries, addVaultEntry, updateVaultEntry, deleteVaultEntry, clearVault, saveResume, getAllResumes, deleteResume, clearResumes } from './modules/vault.js';
 import { fetchGitHubProfile, validateGitHubUser } from './modules/github.js';
-import { rankVaultEntries, generateResume, validateApiKey, improveResumeBullet, generateCoverLetter } from './modules/llm.js';
+import { rankVaultEntries, generateResume, validateApiKey, improveResumeBullet, generateCoverLetter, scoreFitForJD } from './modules/llm.js';
 import { parseResume, extractVaultEntriesFromText } from './modules/parser.js';
 import { renderResumePreview, renderTemplateThumbnail, exportToPDF, getResumeFilename } from './modules/exporter.js';
 import { TEMPLATES, COLOR_THEMES, FONT_PAIRINGS, SAMPLE_RESUME } from './modules/templates/index.js';
@@ -1468,7 +1468,175 @@ function downloadCoverLetter() {
   showToast('Cover letter downloaded!', 'success');
 }
 
+// ===== FIT SCORE =====
+
+/**
+ * Returns a CSS colour string (and label) for a given 1.1–9.9 score.
+ */
+function fitScoreColour(score) {
+  if (score >= 8.5) return { colour: '#22c55e', label: 'Excellent' };
+  if (score >= 7.0) return { colour: '#84cc16', label: 'Strong' };
+  if (score >= 5.5) return { colour: '#f59e0b', label: 'Moderate' };
+  if (score >= 4.0) return { colour: '#f97316', label: 'Weak' };
+  return { colour: '#ef4444', label: 'Poor' };
+}
+
+/**
+ * Renders the animated score dial + breakdown inside #fit-score-output.
+ */
+function renderFitScoreResult(result) {
+  const container = document.getElementById('fit-score-output');
+  if (!container) return;
+
+  const { colour, label } = fitScoreColour(result.score);
+
+  const dimLabels = {
+    skillsMatch:      'Skills match',
+    experienceDepth:  'Experience depth',
+    keywordAlignment: 'Keyword alignment',
+    roleFit:          'Role fit',
+  };
+
+  const dimsHTML = Object.entries(result.dimensions || {}).map(([key, dim]) => {
+    const pct = ((dim.score - 1.1) / (9.9 - 1.1)) * 100;
+    const { colour: dc } = fitScoreColour(dim.score);
+    return `
+      <div class="fit-dim-row">
+        <div class="fit-dim-label">
+          <span>${escHtml(dimLabels[key] || key)}</span>
+          <span class="fit-dim-score" style="color:${dc};">${dim.score.toFixed(1)}</span>
+        </div>
+        <div class="fit-dim-bar-track">
+          <div class="fit-dim-bar-fill" style="width:0%;background:${dc};" data-target="${pct.toFixed(1)}"></div>
+        </div>
+        <div class="fit-dim-note">${escHtml(dim.note || '')}</div>
+      </div>`;
+  }).join('');
+
+  const strengthsHTML = (result.topStrengths || []).map(s =>
+    `<li class="fit-list-item fit-strength">✓ ${escHtml(s)}</li>`).join('');
+
+  const gapsHTML = (result.topGaps || []).map(g =>
+    `<li class="fit-list-item fit-gap">✗ ${escHtml(g)}</li>`).join('');
+
+  const pct = ((result.score - 1.1) / (9.9 - 1.1)) * 100;
+
+  container.innerHTML = `
+    <div class="fit-score-card">
+      <!-- Main dial -->
+      <div class="fit-dial-wrap">
+        <svg class="fit-dial-svg" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="fit-dial-track" cx="60" cy="60" r="50" />
+          <circle class="fit-dial-fill" cx="60" cy="60" r="50"
+            style="stroke:${colour};"
+            stroke-dasharray="${(pct / 100) * 314.16} 314.16"
+            transform="rotate(-90 60 60)" />
+        </svg>
+        <div class="fit-dial-label">
+          <span class="fit-dial-score" style="color:${colour};" id="fit-dial-animated">1.1</span>
+          <span class="fit-dial-tag" style="background:${colour}22;color:${colour};">${label}</span>
+        </div>
+      </div>
+
+      <!-- Verdict -->
+      <p class="fit-verdict">"${escHtml(result.verdict || '')}"</p>
+
+      <!-- Dimension bars -->
+      <div class="fit-dims">${dimsHTML}</div>
+
+      <!-- Strengths & Gaps -->
+      <div class="fit-sg-grid">
+        <div>
+          <div class="fit-sg-header fit-sg-header--green">Top strengths</div>
+          <ul class="fit-list">${strengthsHTML}</ul>
+        </div>
+        <div>
+          <div class="fit-sg-header fit-sg-header--red">Key gaps</div>
+          <ul class="fit-list">${gapsHTML}</ul>
+        </div>
+      </div>
+    </div>`;
+
+  container.style.display = 'block';
+
+  // Animate the big score number
+  const dialEl = document.getElementById('fit-dial-animated');
+  if (dialEl) {
+    const start = 1.1;
+    const end = result.score;
+    const duration = 900;
+    const startTime = performance.now();
+    function tick(now) {
+      const t = Math.min((now - startTime) / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const current = start + (end - start) * eased;
+      dialEl.textContent = current.toFixed(1);
+      if (t < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // Animate dimension bars
+  requestAnimationFrame(() => {
+    container.querySelectorAll('.fit-dim-bar-fill').forEach(bar => {
+      const target = bar.dataset.target;
+      bar.style.transition = 'width 0.8s cubic-bezier(0.34,1.56,0.64,1)';
+      bar.style.width = `${target}%`;
+    });
+  });
+}
+
+async function scoreFitUI() {
+  if (!generatorState.jd) {
+    showToast('Run the generator first to get a fit score.', 'error');
+    return;
+  }
+
+  const settings = getSettings();
+  if (!settings.apiKey) {
+    showToast('Gemini API key required. Configure it in Settings.', 'error');
+    navigate('settings');
+    return;
+  }
+
+  const btn = document.getElementById('fit-score-btn');
+  const outputEl = document.getElementById('fit-score-output');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Scoring…';
+  if (outputEl) { outputEl.style.display = 'none'; outputEl.innerHTML = ''; }
+
+  try {
+    const userProfile = {
+      name: settings.name,
+      email: settings.email,
+      github: settings.github,
+      linkedin: settings.linkedin,
+      location: settings.location,
+    };
+
+    const result = await scoreFitForJD(
+      settings.apiKey,
+      generatorState.jd,
+      generatorState.rankedEntries || [],
+      generatorState.githubData,
+      userProfile,
+      generatorState.existingResumeText || ''
+    );
+
+    renderFitScoreResult(result);
+    addActivity('fit_scored', `Fit score: ${result.score}/9.9`);
+    showToast(`Fit score: ${result.score} — ${result.verdict}`, 'success', 6000);
+  } catch (e) {
+    showToast('Fit score failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '⚡ Check My Fit';
+  }
+}
+
 // ===== SAVED RESUMES =====
+
 function renderResumes() {
   const container = document.getElementById('saved-resumes-list');
 
