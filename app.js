@@ -5,7 +5,7 @@
 
 import { initDB, getAllVaultEntries, addVaultEntry, updateVaultEntry, deleteVaultEntry, clearVault, saveResume, getAllResumes, deleteResume, clearResumes } from './modules/vault.js';
 import { fetchGitHubProfile, validateGitHubUser } from './modules/github.js';
-import { rankVaultEntries, generateResume, validateApiKey, improveResumeBullet } from './modules/llm.js';
+import { rankVaultEntries, generateResume, validateApiKey, improveResumeBullet, generateCoverLetter } from './modules/llm.js';
 import { parseResume, extractVaultEntriesFromText } from './modules/parser.js';
 import { renderResumePreview, renderTemplateThumbnail, exportToPDF, getResumeFilename } from './modules/exporter.js';
 import { TEMPLATES, COLOR_THEMES, FONT_PAIRINGS, SAMPLE_RESUME } from './modules/templates/index.js';
@@ -641,6 +641,7 @@ let generatorState = {
   preferences: createDefaultResumePreferences(),
   templateSelection: getTemplateSelection(),
   previewZoom: 100,
+  existingResumeText: '',
 };
 
 function initGenerator() {
@@ -685,6 +686,17 @@ function initGenerator() {
   renderGeneratorVaultSummary();
   renderResumePreferencesForm();
   updateTokenEstimate();
+
+  // Clear upload state
+  generatorState.existingResumeText = '';
+  const jdStatus = document.getElementById('jd-upload-status');
+  if (jdStatus) jdStatus.textContent = 'PDF or DOCX';
+  const erStatus = document.getElementById('existing-resume-status');
+  if (erStatus) erStatus.textContent = '';
+  const jdFileInput = document.getElementById('jd-file-input');
+  if (jdFileInput) jdFileInput.value = '';
+  const erInput = document.getElementById('existing-resume-input');
+  if (erInput) erInput.value = '';
 }
 
 function showGeneratorStep(step) {
@@ -1086,6 +1098,57 @@ function resetPreviewZoom() {
   applyPreviewZoom();
 }
 
+// ===== GENERATOR FILE UPLOADS =====
+async function handleJDFileUpload(file) {
+  if (!file) return;
+  const statusEl = document.getElementById('jd-upload-status');
+  const labelEl = document.getElementById('jd-upload-label');
+  if (statusEl) statusEl.textContent = `Parsing ${file.name}\u2026`;
+  if (labelEl) labelEl.style.borderColor = 'var(--accent-primary)';
+
+  try {
+    const text = await parseResume(file);
+    if (!text || text.trim().length < 20) {
+      showToast('Could not extract text from the file. Try a different format.', 'warning');
+      if (statusEl) statusEl.textContent = 'PDF or DOCX';
+      if (labelEl) labelEl.style.borderColor = '';
+      return;
+    }
+    document.getElementById('jd-input').value = text.trim();
+    updateTokenEstimate();
+    showToast(`Job description loaded from ${file.name}`, 'success');
+    if (statusEl) statusEl.textContent = `\u2713 ${file.name}`;
+    if (labelEl) labelEl.style.borderColor = 'var(--status-success)';
+  } catch (e) {
+    showToast('Failed to parse file: ' + e.message, 'error');
+    if (statusEl) statusEl.textContent = 'PDF or DOCX';
+    if (labelEl) labelEl.style.borderColor = '';
+  }
+}
+
+async function handleExistingResumeUpload(file) {
+  if (!file) return;
+  const statusEl = document.getElementById('existing-resume-status');
+  const labelEl = document.getElementById('existing-resume-upload-label');
+  if (statusEl) statusEl.textContent = `Parsing ${file.name}\u2026`;
+
+  try {
+    const text = await parseResume(file);
+    if (!text || text.trim().length < 20) {
+      showToast('Could not extract text from your resume. Try a different format.', 'warning');
+      if (statusEl) statusEl.textContent = '';
+      return;
+    }
+    generatorState.existingResumeText = text.trim();
+    showToast(`Resume context loaded from ${file.name}`, 'success');
+    if (statusEl) statusEl.innerHTML = `<span style="color:var(--status-success);">\u2713 ${escHtml(file.name)}</span> \u2014 will be used as extra context`;
+    if (labelEl) labelEl.style.borderColor = 'var(--status-success)';
+  } catch (e) {
+    showToast('Failed to parse resume: ' + e.message, 'error');
+    if (statusEl) statusEl.textContent = '';
+  }
+}
+
 async function startGeneration() {
   const jd = document.getElementById('jd-input').value.trim();
   if (!jd || jd.length < 50) {
@@ -1175,7 +1238,8 @@ async function startGeneration() {
       generatorState.rankedEntries,
       generatorState.githubData,
       userProfile,
-      preferences
+      preferences,
+      generatorState.existingResumeText || ''
     );
 
     setGenerationStatus('🎉', 'Resume generated successfully!', 'ok');
@@ -1295,6 +1359,113 @@ async function exportCurrentResume() {
     btn.disabled = false;
     btn.innerHTML = '⬇️ Export PDF';
   }
+}
+
+// ===== COVER LETTER =====
+let generatedCoverLetterData = null;
+
+async function generateCoverLetterUI() {
+  if (!generatorState.generatedResume) {
+    showToast('Generate a resume first before creating a cover letter.', 'error');
+    return;
+  }
+
+  const settings = getSettings();
+  if (!settings.apiKey) {
+    showToast('Gemini API key required. Configure it in Settings.', 'error');
+    navigate('settings');
+    return;
+  }
+
+  const btn = document.getElementById('gen-cover-letter-btn');
+  const outputEl = document.getElementById('cover-letter-output');
+  const previewEl = document.getElementById('cover-letter-preview');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Generating…';
+  if (outputEl) outputEl.style.display = 'none';
+
+  try {
+    const options = {
+      companyName: document.getElementById('cl-company')?.value?.trim() || '',
+      hiringManager: document.getElementById('cl-hiring-manager')?.value?.trim() || '',
+      tone: document.querySelector('input[name="cl-tone"]:checked')?.value || 'professional',
+    };
+
+    const userProfile = {
+      name: settings.name,
+      email: settings.email,
+      github: settings.github,
+      linkedin: settings.linkedin,
+      location: settings.location,
+    };
+
+    generatedCoverLetterData = await generateCoverLetter(
+      settings.apiKey,
+      generatorState.jd,
+      generatorState.generatedResume,
+      userProfile,
+      options
+    );
+
+    // Render plain-text preview
+    const letter = generatedCoverLetterData;
+    const formatted = [
+      letter.subject ? `Subject: ${letter.subject}\n` : '',
+      letter.greeting,
+      '',
+      ...(letter.paragraphs || []).map(p => p + '\n'),
+      letter.closing,
+      letter.signature,
+    ].filter(l => l !== undefined).join('\n');
+
+    if (previewEl) previewEl.textContent = formatted;
+    if (outputEl) outputEl.style.display = 'block';
+    showToast('Cover letter generated!', 'success');
+    addActivity('cover_letter_generated', `Generated a cover letter`);
+  } catch (e) {
+    showToast('Cover letter failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '&#9993; Generate Cover Letter';
+  }
+}
+
+function getCoverLetterText() {
+  if (!generatedCoverLetterData) return '';
+  const letter = generatedCoverLetterData;
+  return [
+    letter.subject ? `Subject: ${letter.subject}\n` : '',
+    letter.greeting,
+    '',
+    ...(letter.paragraphs || []).map(p => p + '\n'),
+    letter.closing,
+    letter.signature,
+  ].filter(l => l !== undefined).join('\n');
+}
+
+async function copyCoverLetter() {
+  const text = getCoverLetterText();
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('Cover letter copied to clipboard!', 'success');
+  } catch (_) {
+    showToast('Copy failed — please select and copy the text manually.', 'error');
+  }
+}
+
+function downloadCoverLetter() {
+  const text = getCoverLetterText();
+  if (!text) return;
+  const name = (generatorState.generatedResume?.name || 'cover-letter').replace(/\s+/g, '_').toLowerCase();
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${name}_cover_letter.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('Cover letter downloaded!', 'success');
 }
 
 // ===== SAVED RESUMES =====
@@ -1567,6 +1738,8 @@ Object.assign(window, {
   toggleSidebarCollapse,
   toggleMobileSidebar,
   startGeneration,
+  handleJDFileUpload,
+  handleExistingResumeUpload,
   saveCurrentResume,
   exportCurrentResume,
   viewSavedResume,
@@ -1578,6 +1751,9 @@ Object.assign(window, {
   closeConfirm,
   executeConfirm,
   toggleApiKeyVisibility,
+  generateCoverLetterUI,
+  copyCoverLetter,
+  downloadCoverLetter,
 });
 
 // ===== INIT =====
@@ -1666,6 +1842,22 @@ Object.assign(window, {
       }
     });
   });
+
+  // Wire up JD file upload
+  const jdFileInput = document.getElementById('jd-file-input');
+  if (jdFileInput) {
+    jdFileInput.addEventListener('change', (e) => {
+      if (e.target.files[0]) handleJDFileUpload(e.target.files[0]);
+    });
+  }
+
+  // Wire up existing resume upload in generator
+  const existingResumeInput = document.getElementById('existing-resume-input');
+  if (existingResumeInput) {
+    existingResumeInput.addEventListener('change', (e) => {
+      if (e.target.files[0]) handleExistingResumeUpload(e.target.files[0]);
+    });
+  }
 
   // Resume upload in vault page
   const uploadInput = document.getElementById('vault-upload-input');

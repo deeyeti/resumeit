@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
@@ -72,7 +72,18 @@
             <button class="api-key-toggle" onclick="toggleApiKeyVisibility('ob-api-key')" type="button" aria-label="Toggle visibility">👁</button>
           </div>
           <p id="ob-api-feedback" class="inline-feedback" aria-live="polite"></p>
-          <p class="form-hint">Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a></p>
+          <p class="form-hint">Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a> &mdash; <button class="btn-text" style="font-size:var(--text-xs);" type="button" onclick="document.getElementById('api-key-guide').style.display=document.getElementById('api-key-guide').style.display==='none'?'block':'none'">How to get one ↓</button></p>
+          <div id="api-key-guide" style="display:none;margin-top:10px;padding:12px 14px;background:var(--bg-subtle);border:1px solid var(--border);border-radius:var(--radius-md);font-size:var(--text-xs);color:var(--text-secondary);line-height:1.7;">
+            <strong style="display:block;margin-bottom:6px;color:var(--text-primary);">🔑 How to get your free Gemini API key</strong>
+            <ol style="margin:0;padding-left:16px;">
+              <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a></li>
+              <li>Sign in with any Google account</li>
+              <li>Click <strong>&ldquo;Create API key&rdquo;</strong> &rarr; <em>&ldquo;Create API key in new project&rdquo;</em></li>
+              <li>Copy the key (starts with <code>AIza&hellip;</code>)</li>
+              <li>Paste it in the field above and click Continue</li>
+            </ol>
+            <p style="margin:8px 0 0;color:var(--text-muted);">&#10003; Free tier: 1,500 requests/day &middot; No credit card needed &middot; Key stays in your browser only.</p>
+          </div>
         </div>
 
         <div class="ob-nav">
@@ -371,11 +382,19 @@
                   <span class="eyebrow">Step 1 of 4</span>
                 </div>
                 <div class="gen-panel-body">
+                  <!-- JD file upload -->
+                  <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;">
+                    <label id="jd-upload-label" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px dashed var(--border);border-radius:var(--radius-md);font-size:var(--text-xs);color:var(--text-secondary);cursor:pointer;transition:border-color 0.2s;" title="Upload a PDF or DOCX job description">
+                      <input type="file" id="jd-file-input" accept=".pdf,.docx" style="display:none;" />
+                      <span>&#8593; Upload JD</span>
+                    </label>
+                    <span id="jd-upload-status" style="font-size:var(--text-xs);color:var(--text-muted);">PDF or DOCX</span>
+                  </div>
                   <textarea
                     id="jd-input"
                     class="form-textarea"
-                    style="min-height:360px;font-size:var(--text-sm);line-height:var(--leading-relaxed);"
-                    placeholder="Paste the complete job description here — include requirements, responsibilities, and tech stack for the best results."></textarea>
+                    style="min-height:340px;font-size:var(--text-sm);line-height:var(--leading-relaxed);"
+                    placeholder="Paste the complete job description here — or upload a PDF/DOCX above. Include requirements, responsibilities, and tech stack for the best results."></textarea>
                   <div class="token-estimate" id="jd-token-estimate" aria-live="polite">~0 tokens</div>
 
                   <div class="resume-preferences" aria-labelledby="resume-preferences-title">
@@ -454,6 +473,26 @@
                 </div>
                 <div class="gen-panel-body" style="max-height:220px;overflow-y:auto;">
                   <div id="vault-summary-list" style="display:flex;flex-direction:column;gap:2px;"></div>
+                </div>
+              </div>
+
+              <!-- Existing resume upload panel -->
+              <div class="gen-panel">
+                <div class="gen-panel-header">
+                  <span class="gen-panel-title">Your existing resume</span>
+                  <span style="font-size:var(--text-xs);color:var(--text-muted);">Optional</span>
+                </div>
+                <div class="gen-panel-body">
+                  <p style="font-size:var(--text-xs);color:var(--text-secondary);margin-bottom:10px;line-height:1.6;">Upload your current resume to give the AI extra context when writing bullet points.</p>
+                  <label id="existing-resume-upload-label" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px dashed var(--border);border-radius:var(--radius-md);font-size:var(--text-xs);color:var(--text-secondary);cursor:pointer;transition:border-color 0.2s;">
+                    <input type="file" id="existing-resume-input" accept=".pdf,.docx" style="display:none;" />
+                    <span style="font-size:1rem;">&#8593;</span>
+                    <div>
+                      <div style="font-weight:600;color:var(--text-primary);">Upload resume</div>
+                      <div>PDF or DOCX &middot; stays in your browser</div>
+                    </div>
+                  </label>
+                  <div id="existing-resume-status" style="margin-top:8px;font-size:var(--text-xs);color:var(--text-muted);"></div>
                 </div>
               </div>
 
@@ -578,6 +617,47 @@
                   ✓ Keyword-optimised content
                 </div>
               </div>
+
+              <!-- Cover Letter Panel -->
+              <div class="gen-panel" id="cover-letter-panel">
+                <div class="gen-panel-header">
+                  <span class="gen-panel-title">Cover Letter</span>
+                  <span style="font-size:var(--text-xs);color:var(--text-muted);">AI-generated</span>
+                </div>
+                <div class="gen-panel-body" style="display:flex;flex-direction:column;gap:10px;">
+                  <p style="font-size:var(--text-xs);color:var(--text-secondary);line-height:1.6;margin:0;">Generate a tailored cover letter from your resume and job description.</p>
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label" style="font-size:var(--text-xs);" for="cl-company">Company name</label>
+                    <input id="cl-company" class="form-input" type="text" placeholder="Acme Corp" style="font-size:var(--text-xs);" />
+                  </div>
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label" style="font-size:var(--text-xs);" for="cl-hiring-manager">Hiring manager name</label>
+                    <input id="cl-hiring-manager" class="form-input" type="text" placeholder="Jane Smith (optional)" style="font-size:var(--text-xs);" />
+                  </div>
+                  <fieldset style="border:none;padding:0;margin:0;">
+                    <legend style="font-size:var(--text-xs);font-weight:600;color:var(--text-secondary);margin-bottom:4px;">Tone</legend>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                      <label style="display:flex;align-items:center;gap:4px;font-size:var(--text-xs);cursor:pointer;"><input type="radio" name="cl-tone" value="professional" checked /> Professional</label>
+                      <label style="display:flex;align-items:center;gap:4px;font-size:var(--text-xs);cursor:pointer;"><input type="radio" name="cl-tone" value="enthusiastic" /> Enthusiastic</label>
+                      <label style="display:flex;align-items:center;gap:4px;font-size:var(--text-xs);cursor:pointer;"><input type="radio" name="cl-tone" value="concise" /> Concise</label>
+                    </div>
+                  </fieldset>
+                  <button class="btn btn-primary full-width" id="gen-cover-letter-btn" onclick="generateCoverLetterUI()">
+                    &#9993; Generate Cover Letter
+                  </button>
+                  <div id="cover-letter-output" style="display:none;margin-top:4px;">
+                    <div style="font-size:var(--text-xs);font-weight:600;color:var(--text-secondary);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;">
+                      <span>Cover letter preview</span>
+                      <div style="display:flex;gap:6px;">
+                        <button class="btn-text" style="font-size:var(--text-xs);" onclick="copyCoverLetter()">Copy</button>
+                        <button class="btn-text" style="font-size:var(--text-xs);" onclick="downloadCoverLetter()">Download .txt</button>
+                      </div>
+                    </div>
+                    <div id="cover-letter-preview" style="font-size:var(--text-xs);color:var(--text-secondary);line-height:1.8;max-height:320px;overflow-y:auto;padding:12px;background:var(--bg-page);border:1px solid var(--border);border-radius:var(--radius-md);white-space:pre-wrap;"></div>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
@@ -677,7 +757,18 @@
               </div>
               <button class="btn btn-outline" id="validate-key-btn" onclick="validateApiKeyFromSettings()">Validate</button>
             </div>
-            <p class="form-hint">Stored only in your browser's localStorage. Get a key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a></p>
+            <p class="form-hint">Stored only in your browser's localStorage. Get a key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a> &mdash; <button class="btn-text" style="font-size:var(--text-xs);" type="button" onclick="document.getElementById('settings-api-key-guide').style.display=document.getElementById('settings-api-key-guide').style.display==='none'?'block':'none'">How to get one ↓</button></p>
+            <div id="settings-api-key-guide" style="display:none;margin-top:10px;padding:12px 14px;background:var(--bg-subtle);border:1px solid var(--border);border-radius:var(--radius-md);font-size:var(--text-xs);color:var(--text-secondary);line-height:1.7;">
+              <strong style="display:block;margin-bottom:6px;color:var(--text-primary);">🔑 How to get your free Gemini API key</strong>
+              <ol style="margin:0;padding-left:16px;">
+                <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a></li>
+                <li>Sign in with any Google account</li>
+                <li>Click <strong>&ldquo;Create API key&rdquo;</strong> &rarr; <em>&ldquo;Create API key in new project&rdquo;</em></li>
+                <li>Copy the key (starts with <code>AIza&hellip;</code>)</li>
+                <li>Paste it in the field above, click Validate, then Save settings</li>
+              </ol>
+              <p style="margin:8px 0 0;color:var(--text-muted);">&#10003; Free tier: 1,500 requests/day &middot; No credit card needed &middot; Rotating or deleting the key in AI Studio immediately revokes access.</p>
+            </div>
           </div>
         </div>
 

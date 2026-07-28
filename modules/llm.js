@@ -25,7 +25,7 @@ Return ONLY a valid JSON array of objects with this exact structure:
 Score 100 = perfect match, 0 = completely irrelevant. Be strict and precise.`;
 }
 
-function buildResumePrompt(jobDescription, rankedEntries, githubData, userProfile, preferences = {}) {
+function buildResumePrompt(jobDescription, rankedEntries, githubData, userProfile, preferences = {}, existingResumeText = '') {
   const topEntries = rankedEntries.slice(0, 5);
   const pageCount = Number(preferences.pageCount) === 2 ? 2 : 1;
   const sections = preferences.sections || {};
@@ -46,19 +46,60 @@ function buildResumePrompt(jobDescription, rankedEntries, githubData, userProfil
   const highlightedSkills = (preferences.highlightedSkills || []).filter(Boolean);
   const additionalInstructions = String(preferences.additionalInstructions || '').trim();
 
-  return `You are an elite technical resume writer. Generate a complete, ATS-optimized resume for a software engineer.
+  return `You are an elite ATS resume optimization specialist and technical resume writer. Generate a complete, maximally ATS-optimized resume for a software engineer.
 
-STRICT RULES:
+═══════════════════════════════════════════
+ATS MAXIMIZATION — MANDATORY REQUIREMENTS
+═══════════════════════════════════════════
+
+KEYWORD MIRRORING (Critical for ATS parse score):
+- Extract EVERY technical skill, tool, framework, methodology, and qualification from the JD
+- Mirror these keywords EXACTLY (same capitalization, same abbreviations) throughout the resume
+- Especially include them in: Summary, Skills section, and bullet points
+- Do NOT paraphrase keywords — if the JD says "Kubernetes", write "Kubernetes" not "k8s" (unless both appear)
+
+METRICS & QUANTIFICATION (Highest ATS weight):
+- EVERY bullet point MUST contain at least one quantified metric or measurable outcome
+- Use these formats where applicable:
+  • Percentage change: "reduced latency by 42%", "improved test coverage from 61% → 94%"
+  • Scale/volume: "processed 2M+ events/day", "served 500K concurrent users"
+  • Time savings: "cut deployment time from 45 min → 8 min"
+  • Cost impact: "reduced AWS spend by $18K/month"
+  • Team/scope: "led a team of 6 engineers across 3 time zones"
+  • Growth: "grew API adoption from 0 to 12K active integrations"
+- If a vault bullet lacks a metric, INFER a plausible metric based on the context (e.g. scale of company, type of system). Mark inferred metrics with "~" (e.g., "~30% faster").
+- NEVER invent completely fabricated metrics for things that clearly never happened.
+
+BULLET POINT STRUCTURE — Use STAR-lite format:
+  [Strong verb] + [what you did] + [how/technology] + [measurable result]
+  Example: "Architected event-driven microservices on AWS Lambda, cutting p99 latency by 67% and eliminating 3 on-call incidents/week"
+
+STRONG ACTION VERBS — Rotate through high-impact verbs:
+  Architected, Engineered, Spearheaded, Automated, Optimized, Orchestrated, Migrated,
+  Reduced, Scaled, Deployed, Mentored, Delivered, Revamped, Designed, Integrated, Led
+
+SUMMARY OPTIMIZATION:
+- Open with the EXACT target job title from the JD
+- Include 3–5 top keywords from the JD in the first sentence
+- Quantify years of experience and 1–2 headline achievements
+- End with a forward-looking value statement tied to the employer's goals
+
+SKILLS SECTION:
+- List ONLY skills that appear in JD or are directly supported by vault/GitHub data
+- Group by: languages, frameworks, tools, methodologies
+- Prioritize skills in the SAME ORDER they appear in the JD requirements
+- Include both long-form and abbreviated forms when both appear in JD (e.g., "Amazon Web Services (AWS)")
+
+═══════════════════════════════════════════
+OUTPUT RULES
+═══════════════════════════════════════════
 - Output ONLY valid JSON (no markdown, no code blocks, no extra text)
-- Use strong action verbs for bullet points
-- Quantify achievements where possible
-- Tailor ALL content to the job description below
 - Avoid complex formatting (no tables, no columns)
-- Keep bullet points concise (under 120 characters each)
+- Keep bullet points concise (under 140 characters each)
 - Target a ${pageCount}-page resume. ${pageCount === 1
-    ? 'Be ruthlessly concise: include only the strongest, most relevant material and keep the result to one A4 page.'
-    : 'Use the available space deliberately, but do not exceed two A4 pages.'}
-- Do not invent employers, projects, degrees, certifications, metrics, or skills.
+    ? 'Be ruthlessly concise: 3–4 bullets per role, only top 3 most relevant roles, one A4 page.'
+    : 'Use the full two pages deliberately — 4–6 bullets per role, surface all relevant projects and achievements.'}
+- Do not invent employers, projects, degrees, certifications, or skills not supported by the input data.
 - For sections the user excluded, return an empty string, empty array, or empty skills object as appropriate.
 
 TARGET JOB DESCRIPTION:
@@ -84,6 +125,9 @@ USER CONTENT PREFERENCES:
 - Exclude these sections: ${excludedSections.join(', ') || 'None'}
 - Skills and languages to highlight: ${highlightedSkills.join(', ') || 'No additional preferences'}
 - Additional instructions: ${additionalInstructions || 'None'}
+${existingResumeText ? `
+CANDIDATE'S EXISTING RESUME (for additional context — extract any implied metrics, responsibilities, or technical depth not yet in the vault entries above):
+${existingResumeText.substring(0, 6000)}` : ''}
 
 Return this EXACT JSON structure:
 {
@@ -142,7 +186,7 @@ async function callGemini(apiKey, prompt) {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
       temperature: 0.4,
-      maxOutputTokens: 4096,
+      maxOutputTokens: 8192,
       responseMimeType: 'application/json',
     },
     safetySettings: [
@@ -195,8 +239,8 @@ export async function rankVaultEntries(apiKey, jobDescription, vaultEntries) {
     .sort((a, b) => b.relevanceScore - a.relevanceScore);
 }
 
-export async function generateResume(apiKey, jobDescription, rankedEntries, githubData, userProfile, preferences = {}) {
-  const prompt = buildResumePrompt(jobDescription, rankedEntries, githubData, userProfile, preferences);
+export async function generateResume(apiKey, jobDescription, rankedEntries, githubData, userProfile, preferences = {}, existingResumeText = '') {
+  const prompt = buildResumePrompt(jobDescription, rankedEntries, githubData, userProfile, preferences, existingResumeText);
   return callGemini(apiKey, prompt);
 }
 
@@ -218,4 +262,63 @@ Context: ${context || 'Software engineering role'}`;
 
   const result = await callGemini(apiKey, prompt);
   return result.improved || bullet;
+}
+
+export async function generateCoverLetter(apiKey, jobDescription, resumeData, userProfile, options = {}) {
+  const hiringManager = options.hiringManager ? String(options.hiringManager).trim() : '';
+  const companyName = options.companyName ? String(options.companyName).trim() : '';
+  const tone = options.tone || 'professional'; // professional | enthusiastic | concise
+
+  const prompt = `You are an expert professional cover letter writer. Write a compelling, ATS-friendly cover letter for the candidate below.
+
+TONE: ${tone}
+LENGTH: 3–4 paragraphs (250–350 words). Never write more than 400 words.
+
+COVER LETTER RULES:
+- Open with a strong hook that references the specific role and a headline achievement
+- Middle paragraphs: mirror 2–3 key requirements from the JD with specific examples and metrics from the candidate's experience
+- Closing paragraph: express genuine enthusiasm for the company and a clear CTA (interview request)
+- NEVER use generic filler phrases like "I am writing to apply for..." or "I believe I am a great fit"
+- Use the same keywords that appear in the job description
+- Sound like a real human, not a template
+- Do NOT use bullet points in the body — prose only
+- Keep the tone ${tone}
+
+JOB DESCRIPTION:
+${jobDescription.substring(0, 4000)}
+
+CANDIDATE PROFILE:
+Name: ${userProfile.name || 'Candidate'}
+Email: ${userProfile.email || ''}
+LinkedIn: ${userProfile.linkedin || ''}
+GitHub: ${userProfile.github ? `github.com/${userProfile.github}` : ''}
+
+CANDIDATE'S RESUME SUMMARY:
+Tagline: ${resumeData?.tagline || ''}
+Summary: ${resumeData?.summary || ''}
+Top experience: ${(resumeData?.experience || []).slice(0, 2).map(e => `${e.title} at ${e.company} — ${(e.bullets || []).slice(0, 2).join('; ')}`).join('\n')}
+
+${companyName ? `COMPANY: ${companyName}` : ''}
+${hiringManager ? `HIRING MANAGER: ${hiringManager}` : ''}
+
+Return ONLY this exact JSON structure (no markdown, no code blocks):
+{
+  "subject": "Application for [Job Title] — [Candidate Name]",
+  "greeting": "Dear ${hiringManager ? hiringManager : 'Hiring Manager'},",
+  "paragraphs": [
+    "Opening paragraph...",
+    "Body paragraph 1...",
+    "Body paragraph 2...",
+    "Closing paragraph with CTA..."
+  ],
+  "closing": "Sincerely,",
+  "signature": "${userProfile.name || 'Your Name'}"
+}`;
+
+  const result = await callGemini(apiKey, prompt);
+  // Validate structure
+  if (!result.paragraphs || !Array.isArray(result.paragraphs)) {
+    throw new Error('Cover letter generation returned unexpected structure. Please try again.');
+  }
+  return result;
 }
