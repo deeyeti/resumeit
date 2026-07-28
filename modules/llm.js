@@ -46,19 +46,60 @@ function buildResumePrompt(jobDescription, rankedEntries, githubData, userProfil
   const highlightedSkills = (preferences.highlightedSkills || []).filter(Boolean);
   const additionalInstructions = String(preferences.additionalInstructions || '').trim();
 
-  return `You are an elite technical resume writer. Generate a complete, ATS-optimized resume for a software engineer.
+  return `You are an elite ATS resume optimization specialist and technical resume writer. Generate a complete, maximally ATS-optimized resume for a software engineer.
 
-STRICT RULES:
+═══════════════════════════════════════════
+ATS MAXIMIZATION — MANDATORY REQUIREMENTS
+═══════════════════════════════════════════
+
+KEYWORD MIRRORING (Critical for ATS parse score):
+- Extract EVERY technical skill, tool, framework, methodology, and qualification from the JD
+- Mirror these keywords EXACTLY (same capitalization, same abbreviations) throughout the resume
+- Especially include them in: Summary, Skills section, and bullet points
+- Do NOT paraphrase keywords — if the JD says "Kubernetes", write "Kubernetes" not "k8s" (unless both appear)
+
+METRICS & QUANTIFICATION (Highest ATS weight):
+- EVERY bullet point MUST contain at least one quantified metric or measurable outcome
+- Use these formats where applicable:
+  • Percentage change: "reduced latency by 42%", "improved test coverage from 61% → 94%"
+  • Scale/volume: "processed 2M+ events/day", "served 500K concurrent users"
+  • Time savings: "cut deployment time from 45 min → 8 min"
+  • Cost impact: "reduced AWS spend by $18K/month"
+  • Team/scope: "led a team of 6 engineers across 3 time zones"
+  • Growth: "grew API adoption from 0 to 12K active integrations"
+- If a vault bullet lacks a metric, INFER a plausible metric based on the context (e.g. scale of company, type of system). Mark inferred metrics with "~" (e.g., "~30% faster").
+- NEVER invent completely fabricated metrics for things that clearly never happened.
+
+BULLET POINT STRUCTURE — Use STAR-lite format:
+  [Strong verb] + [what you did] + [how/technology] + [measurable result]
+  Example: "Architected event-driven microservices on AWS Lambda, cutting p99 latency by 67% and eliminating 3 on-call incidents/week"
+
+STRONG ACTION VERBS — Rotate through high-impact verbs:
+  Architected, Engineered, Spearheaded, Automated, Optimized, Orchestrated, Migrated,
+  Reduced, Scaled, Deployed, Mentored, Delivered, Revamped, Designed, Integrated, Led
+
+SUMMARY OPTIMIZATION:
+- Open with the EXACT target job title from the JD
+- Include 3–5 top keywords from the JD in the first sentence
+- Quantify years of experience and 1–2 headline achievements
+- End with a forward-looking value statement tied to the employer's goals
+
+SKILLS SECTION:
+- List ONLY skills that appear in JD or are directly supported by vault/GitHub data
+- Group by: languages, frameworks, tools, methodologies
+- Prioritize skills in the SAME ORDER they appear in the JD requirements
+- Include both long-form and abbreviated forms when both appear in JD (e.g., "Amazon Web Services (AWS)")
+
+═══════════════════════════════════════════
+OUTPUT RULES
+═══════════════════════════════════════════
 - Output ONLY valid JSON (no markdown, no code blocks, no extra text)
-- Use strong action verbs for bullet points
-- Quantify achievements where possible
-- Tailor ALL content to the job description below
 - Avoid complex formatting (no tables, no columns)
-- Keep bullet points concise (under 120 characters each)
+- Keep bullet points concise (under 140 characters each)
 - Target a ${pageCount}-page resume. ${pageCount === 1
-    ? 'Be ruthlessly concise: include only the strongest, most relevant material and keep the result to one A4 page.'
-    : 'Use the available space deliberately, but do not exceed two A4 pages.'}
-- Do not invent employers, projects, degrees, certifications, metrics, or skills.
+    ? 'Be ruthlessly concise: 3–4 bullets per role, only top 3 most relevant roles, one A4 page.'
+    : 'Use the full two pages deliberately — 4–6 bullets per role, surface all relevant projects and achievements.'}
+- Do not invent employers, projects, degrees, certifications, or skills not supported by the input data.
 - For sections the user excluded, return an empty string, empty array, or empty skills object as appropriate.
 
 TARGET JOB DESCRIPTION:
@@ -142,7 +183,7 @@ async function callGemini(apiKey, prompt) {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
       temperature: 0.4,
-      maxOutputTokens: 4096,
+      maxOutputTokens: 8192,
       responseMimeType: 'application/json',
     },
     safetySettings: [
