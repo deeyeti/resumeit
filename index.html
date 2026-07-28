@@ -382,11 +382,19 @@
                   <span class="eyebrow">Step 1 of 4</span>
                 </div>
                 <div class="gen-panel-body">
+                  <!-- JD file upload -->
+                  <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;">
+                    <label id="jd-upload-label" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px dashed var(--border);border-radius:var(--radius-md);font-size:var(--text-xs);color:var(--text-secondary);cursor:pointer;transition:border-color 0.2s;" title="Upload a PDF or DOCX job description">
+                      <input type="file" id="jd-file-input" accept=".pdf,.docx" style="display:none;" />
+                      <span>&#8593; Upload JD</span>
+                    </label>
+                    <span id="jd-upload-status" style="font-size:var(--text-xs);color:var(--text-muted);">PDF or DOCX</span>
+                  </div>
                   <textarea
                     id="jd-input"
                     class="form-textarea"
-                    style="min-height:360px;font-size:var(--text-sm);line-height:var(--leading-relaxed);"
-                    placeholder="Paste the complete job description here — include requirements, responsibilities, and tech stack for the best results."></textarea>
+                    style="min-height:340px;font-size:var(--text-sm);line-height:var(--leading-relaxed);"
+                    placeholder="Paste the complete job description here — or upload a PDF/DOCX above. Include requirements, responsibilities, and tech stack for the best results."></textarea>
                   <div class="token-estimate" id="jd-token-estimate" aria-live="polite">~0 tokens</div>
 
                   <div class="resume-preferences" aria-labelledby="resume-preferences-title">
@@ -465,6 +473,26 @@
                 </div>
                 <div class="gen-panel-body" style="max-height:220px;overflow-y:auto;">
                   <div id="vault-summary-list" style="display:flex;flex-direction:column;gap:2px;"></div>
+                </div>
+              </div>
+
+              <!-- Existing resume upload panel -->
+              <div class="gen-panel">
+                <div class="gen-panel-header">
+                  <span class="gen-panel-title">Your existing resume</span>
+                  <span style="font-size:var(--text-xs);color:var(--text-muted);">Optional</span>
+                </div>
+                <div class="gen-panel-body">
+                  <p style="font-size:var(--text-xs);color:var(--text-secondary);margin-bottom:10px;line-height:1.6;">Upload your current resume to give the AI extra context when writing bullet points.</p>
+                  <label id="existing-resume-upload-label" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px dashed var(--border);border-radius:var(--radius-md);font-size:var(--text-xs);color:var(--text-secondary);cursor:pointer;transition:border-color 0.2s;">
+                    <input type="file" id="existing-resume-input" accept=".pdf,.docx" style="display:none;" />
+                    <span style="font-size:1rem;">&#8593;</span>
+                    <div>
+                      <div style="font-weight:600;color:var(--text-primary);">Upload resume</div>
+                      <div>PDF or DOCX &middot; stays in your browser</div>
+                    </div>
+                  </label>
+                  <div id="existing-resume-status" style="margin-top:8px;font-size:var(--text-xs);color:var(--text-muted);"></div>
                 </div>
               </div>
 

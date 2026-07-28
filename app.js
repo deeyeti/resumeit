@@ -641,6 +641,7 @@ let generatorState = {
   preferences: createDefaultResumePreferences(),
   templateSelection: getTemplateSelection(),
   previewZoom: 100,
+  existingResumeText: '',
 };
 
 function initGenerator() {
@@ -685,6 +686,17 @@ function initGenerator() {
   renderGeneratorVaultSummary();
   renderResumePreferencesForm();
   updateTokenEstimate();
+
+  // Clear upload state
+  generatorState.existingResumeText = '';
+  const jdStatus = document.getElementById('jd-upload-status');
+  if (jdStatus) jdStatus.textContent = 'PDF or DOCX';
+  const erStatus = document.getElementById('existing-resume-status');
+  if (erStatus) erStatus.textContent = '';
+  const jdFileInput = document.getElementById('jd-file-input');
+  if (jdFileInput) jdFileInput.value = '';
+  const erInput = document.getElementById('existing-resume-input');
+  if (erInput) erInput.value = '';
 }
 
 function showGeneratorStep(step) {
@@ -1086,6 +1098,57 @@ function resetPreviewZoom() {
   applyPreviewZoom();
 }
 
+// ===== GENERATOR FILE UPLOADS =====
+async function handleJDFileUpload(file) {
+  if (!file) return;
+  const statusEl = document.getElementById('jd-upload-status');
+  const labelEl = document.getElementById('jd-upload-label');
+  if (statusEl) statusEl.textContent = `Parsing ${file.name}\u2026`;
+  if (labelEl) labelEl.style.borderColor = 'var(--accent-primary)';
+
+  try {
+    const text = await parseResume(file);
+    if (!text || text.trim().length < 20) {
+      showToast('Could not extract text from the file. Try a different format.', 'warning');
+      if (statusEl) statusEl.textContent = 'PDF or DOCX';
+      if (labelEl) labelEl.style.borderColor = '';
+      return;
+    }
+    document.getElementById('jd-input').value = text.trim();
+    updateTokenEstimate();
+    showToast(`Job description loaded from ${file.name}`, 'success');
+    if (statusEl) statusEl.textContent = `\u2713 ${file.name}`;
+    if (labelEl) labelEl.style.borderColor = 'var(--status-success)';
+  } catch (e) {
+    showToast('Failed to parse file: ' + e.message, 'error');
+    if (statusEl) statusEl.textContent = 'PDF or DOCX';
+    if (labelEl) labelEl.style.borderColor = '';
+  }
+}
+
+async function handleExistingResumeUpload(file) {
+  if (!file) return;
+  const statusEl = document.getElementById('existing-resume-status');
+  const labelEl = document.getElementById('existing-resume-upload-label');
+  if (statusEl) statusEl.textContent = `Parsing ${file.name}\u2026`;
+
+  try {
+    const text = await parseResume(file);
+    if (!text || text.trim().length < 20) {
+      showToast('Could not extract text from your resume. Try a different format.', 'warning');
+      if (statusEl) statusEl.textContent = '';
+      return;
+    }
+    generatorState.existingResumeText = text.trim();
+    showToast(`Resume context loaded from ${file.name}`, 'success');
+    if (statusEl) statusEl.innerHTML = `<span style="color:var(--status-success);">\u2713 ${escHtml(file.name)}</span> \u2014 will be used as extra context`;
+    if (labelEl) labelEl.style.borderColor = 'var(--status-success)';
+  } catch (e) {
+    showToast('Failed to parse resume: ' + e.message, 'error');
+    if (statusEl) statusEl.textContent = '';
+  }
+}
+
 async function startGeneration() {
   const jd = document.getElementById('jd-input').value.trim();
   if (!jd || jd.length < 50) {
@@ -1175,7 +1238,8 @@ async function startGeneration() {
       generatorState.rankedEntries,
       generatorState.githubData,
       userProfile,
-      preferences
+      preferences,
+      generatorState.existingResumeText || ''
     );
 
     setGenerationStatus('🎉', 'Resume generated successfully!', 'ok');
@@ -1567,6 +1631,8 @@ Object.assign(window, {
   toggleSidebarCollapse,
   toggleMobileSidebar,
   startGeneration,
+  handleJDFileUpload,
+  handleExistingResumeUpload,
   saveCurrentResume,
   exportCurrentResume,
   viewSavedResume,
@@ -1666,6 +1732,22 @@ Object.assign(window, {
       }
     });
   });
+
+  // Wire up JD file upload
+  const jdFileInput = document.getElementById('jd-file-input');
+  if (jdFileInput) {
+    jdFileInput.addEventListener('change', (e) => {
+      if (e.target.files[0]) handleJDFileUpload(e.target.files[0]);
+    });
+  }
+
+  // Wire up existing resume upload in generator
+  const existingResumeInput = document.getElementById('existing-resume-input');
+  if (existingResumeInput) {
+    existingResumeInput.addEventListener('change', (e) => {
+      if (e.target.files[0]) handleExistingResumeUpload(e.target.files[0]);
+    });
+  }
 
   // Resume upload in vault page
   const uploadInput = document.getElementById('vault-upload-input');

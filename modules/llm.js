@@ -25,7 +25,7 @@ Return ONLY a valid JSON array of objects with this exact structure:
 Score 100 = perfect match, 0 = completely irrelevant. Be strict and precise.`;
 }
 
-function buildResumePrompt(jobDescription, rankedEntries, githubData, userProfile, preferences = {}) {
+function buildResumePrompt(jobDescription, rankedEntries, githubData, userProfile, preferences = {}, existingResumeText = '') {
   const topEntries = rankedEntries.slice(0, 5);
   const pageCount = Number(preferences.pageCount) === 2 ? 2 : 1;
   const sections = preferences.sections || {};
@@ -125,6 +125,9 @@ USER CONTENT PREFERENCES:
 - Exclude these sections: ${excludedSections.join(', ') || 'None'}
 - Skills and languages to highlight: ${highlightedSkills.join(', ') || 'No additional preferences'}
 - Additional instructions: ${additionalInstructions || 'None'}
+${existingResumeText ? `
+CANDIDATE'S EXISTING RESUME (for additional context — extract any implied metrics, responsibilities, or technical depth not yet in the vault entries above):
+${existingResumeText.substring(0, 6000)}` : ''}
 
 Return this EXACT JSON structure:
 {
@@ -236,8 +239,8 @@ export async function rankVaultEntries(apiKey, jobDescription, vaultEntries) {
     .sort((a, b) => b.relevanceScore - a.relevanceScore);
 }
 
-export async function generateResume(apiKey, jobDescription, rankedEntries, githubData, userProfile, preferences = {}) {
-  const prompt = buildResumePrompt(jobDescription, rankedEntries, githubData, userProfile, preferences);
+export async function generateResume(apiKey, jobDescription, rankedEntries, githubData, userProfile, preferences = {}, existingResumeText = '') {
+  const prompt = buildResumePrompt(jobDescription, rankedEntries, githubData, userProfile, preferences, existingResumeText);
   return callGemini(apiKey, prompt);
 }
 
