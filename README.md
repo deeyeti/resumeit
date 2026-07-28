@@ -87,6 +87,59 @@ npx serve .
 
 ---
 
+## 🔑 Getting Your Gemini API Key (Free)
+
+ResumeIt uses the **Google Gemini API** to generate and rank resume content. You supply your own key — it's free for personal use, stays in your browser, and is never sent to any third-party server.
+
+### Step-by-step guide
+
+**1. Go to Google AI Studio**  
+Open [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) in your browser.  
+You will need a Google account (any Gmail or Google Workspace account works).
+
+**2. Sign in**  
+Click **Sign in with Google** and complete the authentication flow.
+
+**3. Agree to Terms of Service** *(first time only)*  
+If prompted, accept the Google AI API Terms of Service to activate your account.
+
+**4. Create an API key**  
+- Click the **"Create API key"** button (top-left or centre of the page).
+- Choose **"Create API key in new project"** — a new project is created automatically.
+- Your new key appears immediately (starts with `AIza...`).
+
+**5. Copy your key**  
+Click the copy icon next to your key. Keep this key private — treat it like a password.
+
+**6. Paste it into ResumeIt**  
+- Open ResumeIt and complete the onboarding wizard, **or** go to **Settings → API Configuration**.
+- Paste the key into the **Gemini API key** field.
+- Click **Validate** to confirm it works.
+- Click **Save settings**.
+
+### Is it really free?
+
+Yes. Google's Gemini free tier (`gemini-2.0-flash`) provides:
+- **1,500 requests/day**
+- **1 million tokens/minute**
+
+Generating one resume typically uses ~1,500–3,000 tokens. You can generate **hundreds of resumes per day** at no cost.
+
+> ⚠️ **Never share your API key publicly** (e.g., in a public GitHub repo, Discord, or screenshot). Anyone with your key can consume your quota. If you accidentally expose it, rotate it immediately at [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey).
+
+### Troubleshooting
+
+| Error | Solution |
+|---|---|
+| `Invalid API key` | Make sure you copied the full key (starts with `AIza`) with no extra spaces |
+| `API key not valid. Please pass a valid API key.` | Regenerate the key in AI Studio — sometimes new keys take 60s to activate |
+| `Rate limit exceeded` | You've hit the free-tier limit. Wait 60 seconds or check [quota usage](https://console.cloud.google.com/apis/api/generativelanguage.googleapis.com/quotas) |
+| Key not saved after refresh | Your browser may be blocking `localStorage`. Try disabling private/incognito mode |
+
+
+
+---
+
 ## 🏗️ Architecture
 
 ```

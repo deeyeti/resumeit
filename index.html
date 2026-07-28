@@ -72,7 +72,18 @@
             <button class="api-key-toggle" onclick="toggleApiKeyVisibility('ob-api-key')" type="button" aria-label="Toggle visibility">👁</button>
           </div>
           <p id="ob-api-feedback" class="inline-feedback" aria-live="polite"></p>
-          <p class="form-hint">Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a></p>
+          <p class="form-hint">Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a> &mdash; <button class="btn-text" style="font-size:var(--text-xs);" type="button" onclick="document.getElementById('api-key-guide').style.display=document.getElementById('api-key-guide').style.display==='none'?'block':'none'">How to get one ↓</button></p>
+          <div id="api-key-guide" style="display:none;margin-top:10px;padding:12px 14px;background:var(--bg-subtle);border:1px solid var(--border);border-radius:var(--radius-md);font-size:var(--text-xs);color:var(--text-secondary);line-height:1.7;">
+            <strong style="display:block;margin-bottom:6px;color:var(--text-primary);">🔑 How to get your free Gemini API key</strong>
+            <ol style="margin:0;padding-left:16px;">
+              <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a></li>
+              <li>Sign in with any Google account</li>
+              <li>Click <strong>&ldquo;Create API key&rdquo;</strong> &rarr; <em>&ldquo;Create API key in new project&rdquo;</em></li>
+              <li>Copy the key (starts with <code>AIza&hellip;</code>)</li>
+              <li>Paste it in the field above and click Continue</li>
+            </ol>
+            <p style="margin:8px 0 0;color:var(--text-muted);">&#10003; Free tier: 1,500 requests/day &middot; No credit card needed &middot; Key stays in your browser only.</p>
+          </div>
         </div>
 
         <div class="ob-nav">
@@ -677,7 +688,18 @@
               </div>
               <button class="btn btn-outline" id="validate-key-btn" onclick="validateApiKeyFromSettings()">Validate</button>
             </div>
-            <p class="form-hint">Stored only in your browser's localStorage. Get a key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a></p>
+            <p class="form-hint">Stored only in your browser's localStorage. Get a key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a> &mdash; <button class="btn-text" style="font-size:var(--text-xs);" type="button" onclick="document.getElementById('settings-api-key-guide').style.display=document.getElementById('settings-api-key-guide').style.display==='none'?'block':'none'">How to get one ↓</button></p>
+            <div id="settings-api-key-guide" style="display:none;margin-top:10px;padding:12px 14px;background:var(--bg-subtle);border:1px solid var(--border);border-radius:var(--radius-md);font-size:var(--text-xs);color:var(--text-secondary);line-height:1.7;">
+              <strong style="display:block;margin-bottom:6px;color:var(--text-primary);">🔑 How to get your free Gemini API key</strong>
+              <ol style="margin:0;padding-left:16px;">
+                <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a></li>
+                <li>Sign in with any Google account</li>
+                <li>Click <strong>&ldquo;Create API key&rdquo;</strong> &rarr; <em>&ldquo;Create API key in new project&rdquo;</em></li>
+                <li>Copy the key (starts with <code>AIza&hellip;</code>)</li>
+                <li>Paste it in the field above, click Validate, then Save settings</li>
+              </ol>
+              <p style="margin:8px 0 0;color:var(--text-muted);">&#10003; Free tier: 1,500 requests/day &middot; No credit card needed &middot; Rotating or deleting the key in AI Studio immediately revokes access.</p>
+            </div>
           </div>
         </div>
 
