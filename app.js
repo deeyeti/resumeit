@@ -5,7 +5,7 @@
 
 import { initDB, getAllVaultEntries, addVaultEntry, updateVaultEntry, deleteVaultEntry, clearVault, saveResume, getAllResumes, deleteResume, clearResumes } from './modules/vault.js';
 import { fetchGitHubProfile, validateGitHubUser } from './modules/github.js';
-import { rankVaultEntries, generateResume, validateApiKey, improveResumeBullet } from './modules/llm.js';
+import { rankVaultEntries, generateResume, validateApiKey, improveResumeBullet, generateCoverLetter } from './modules/llm.js';
 import { parseResume, extractVaultEntriesFromText } from './modules/parser.js';
 import { renderResumePreview, renderTemplateThumbnail, exportToPDF, getResumeFilename } from './modules/exporter.js';
 import { TEMPLATES, COLOR_THEMES, FONT_PAIRINGS, SAMPLE_RESUME } from './modules/templates/index.js';
@@ -1361,6 +1361,113 @@ async function exportCurrentResume() {
   }
 }
 
+// ===== COVER LETTER =====
+let generatedCoverLetterData = null;
+
+async function generateCoverLetterUI() {
+  if (!generatorState.generatedResume) {
+    showToast('Generate a resume first before creating a cover letter.', 'error');
+    return;
+  }
+
+  const settings = getSettings();
+  if (!settings.apiKey) {
+    showToast('Gemini API key required. Configure it in Settings.', 'error');
+    navigate('settings');
+    return;
+  }
+
+  const btn = document.getElementById('gen-cover-letter-btn');
+  const outputEl = document.getElementById('cover-letter-output');
+  const previewEl = document.getElementById('cover-letter-preview');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Generating…';
+  if (outputEl) outputEl.style.display = 'none';
+
+  try {
+    const options = {
+      companyName: document.getElementById('cl-company')?.value?.trim() || '',
+      hiringManager: document.getElementById('cl-hiring-manager')?.value?.trim() || '',
+      tone: document.querySelector('input[name="cl-tone"]:checked')?.value || 'professional',
+    };
+
+    const userProfile = {
+      name: settings.name,
+      email: settings.email,
+      github: settings.github,
+      linkedin: settings.linkedin,
+      location: settings.location,
+    };
+
+    generatedCoverLetterData = await generateCoverLetter(
+      settings.apiKey,
+      generatorState.jd,
+      generatorState.generatedResume,
+      userProfile,
+      options
+    );
+
+    // Render plain-text preview
+    const letter = generatedCoverLetterData;
+    const formatted = [
+      letter.subject ? `Subject: ${letter.subject}\n` : '',
+      letter.greeting,
+      '',
+      ...(letter.paragraphs || []).map(p => p + '\n'),
+      letter.closing,
+      letter.signature,
+    ].filter(l => l !== undefined).join('\n');
+
+    if (previewEl) previewEl.textContent = formatted;
+    if (outputEl) outputEl.style.display = 'block';
+    showToast('Cover letter generated!', 'success');
+    addActivity('cover_letter_generated', `Generated a cover letter`);
+  } catch (e) {
+    showToast('Cover letter failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '&#9993; Generate Cover Letter';
+  }
+}
+
+function getCoverLetterText() {
+  if (!generatedCoverLetterData) return '';
+  const letter = generatedCoverLetterData;
+  return [
+    letter.subject ? `Subject: ${letter.subject}\n` : '',
+    letter.greeting,
+    '',
+    ...(letter.paragraphs || []).map(p => p + '\n'),
+    letter.closing,
+    letter.signature,
+  ].filter(l => l !== undefined).join('\n');
+}
+
+async function copyCoverLetter() {
+  const text = getCoverLetterText();
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('Cover letter copied to clipboard!', 'success');
+  } catch (_) {
+    showToast('Copy failed — please select and copy the text manually.', 'error');
+  }
+}
+
+function downloadCoverLetter() {
+  const text = getCoverLetterText();
+  if (!text) return;
+  const name = (generatorState.generatedResume?.name || 'cover-letter').replace(/\s+/g, '_').toLowerCase();
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${name}_cover_letter.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('Cover letter downloaded!', 'success');
+}
+
 // ===== SAVED RESUMES =====
 function renderResumes() {
   const container = document.getElementById('saved-resumes-list');
@@ -1644,6 +1751,9 @@ Object.assign(window, {
   closeConfirm,
   executeConfirm,
   toggleApiKeyVisibility,
+  generateCoverLetterUI,
+  copyCoverLetter,
+  downloadCoverLetter,
 });
 
 // ===== INIT =====

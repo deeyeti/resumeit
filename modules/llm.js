@@ -263,3 +263,62 @@ Context: ${context || 'Software engineering role'}`;
   const result = await callGemini(apiKey, prompt);
   return result.improved || bullet;
 }
+
+export async function generateCoverLetter(apiKey, jobDescription, resumeData, userProfile, options = {}) {
+  const hiringManager = options.hiringManager ? String(options.hiringManager).trim() : '';
+  const companyName = options.companyName ? String(options.companyName).trim() : '';
+  const tone = options.tone || 'professional'; // professional | enthusiastic | concise
+
+  const prompt = `You are an expert professional cover letter writer. Write a compelling, ATS-friendly cover letter for the candidate below.
+
+TONE: ${tone}
+LENGTH: 3–4 paragraphs (250–350 words). Never write more than 400 words.
+
+COVER LETTER RULES:
+- Open with a strong hook that references the specific role and a headline achievement
+- Middle paragraphs: mirror 2–3 key requirements from the JD with specific examples and metrics from the candidate's experience
+- Closing paragraph: express genuine enthusiasm for the company and a clear CTA (interview request)
+- NEVER use generic filler phrases like "I am writing to apply for..." or "I believe I am a great fit"
+- Use the same keywords that appear in the job description
+- Sound like a real human, not a template
+- Do NOT use bullet points in the body — prose only
+- Keep the tone ${tone}
+
+JOB DESCRIPTION:
+${jobDescription.substring(0, 4000)}
+
+CANDIDATE PROFILE:
+Name: ${userProfile.name || 'Candidate'}
+Email: ${userProfile.email || ''}
+LinkedIn: ${userProfile.linkedin || ''}
+GitHub: ${userProfile.github ? `github.com/${userProfile.github}` : ''}
+
+CANDIDATE'S RESUME SUMMARY:
+Tagline: ${resumeData?.tagline || ''}
+Summary: ${resumeData?.summary || ''}
+Top experience: ${(resumeData?.experience || []).slice(0, 2).map(e => `${e.title} at ${e.company} — ${(e.bullets || []).slice(0, 2).join('; ')}`).join('\n')}
+
+${companyName ? `COMPANY: ${companyName}` : ''}
+${hiringManager ? `HIRING MANAGER: ${hiringManager}` : ''}
+
+Return ONLY this exact JSON structure (no markdown, no code blocks):
+{
+  "subject": "Application for [Job Title] — [Candidate Name]",
+  "greeting": "Dear ${hiringManager ? hiringManager : 'Hiring Manager'},",
+  "paragraphs": [
+    "Opening paragraph...",
+    "Body paragraph 1...",
+    "Body paragraph 2...",
+    "Closing paragraph with CTA..."
+  ],
+  "closing": "Sincerely,",
+  "signature": "${userProfile.name || 'Your Name'}"
+}`;
+
+  const result = await callGemini(apiKey, prompt);
+  // Validate structure
+  if (!result.paragraphs || !Array.isArray(result.paragraphs)) {
+    throw new Error('Cover letter generation returned unexpected structure. Please try again.');
+  }
+  return result;
+}
