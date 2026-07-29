@@ -4,9 +4,10 @@
  */
 
 const DB_NAME = 'resumeit_db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE_VAULT = 'vault';
 const STORE_RESUMES = 'resumes';
+const STORE_APPLICATIONS = 'applications';
 
 let db = null;
 
@@ -26,6 +27,12 @@ export async function initDB() {
       if (!database.objectStoreNames.contains(STORE_RESUMES)) {
         const resumeStore = database.createObjectStore(STORE_RESUMES, { keyPath: 'id', autoIncrement: true });
         resumeStore.createIndex('createdAt', 'createdAt', { unique: false });
+      }
+
+      if (!database.objectStoreNames.contains(STORE_APPLICATIONS)) {
+        const appStore = database.createObjectStore(STORE_APPLICATIONS, { keyPath: 'id', autoIncrement: true });
+        appStore.createIndex('status', 'status', { unique: false });
+        appStore.createIndex('createdAt', 'createdAt', { unique: false });
       }
     };
 
@@ -134,6 +141,55 @@ export async function deleteResume(id) {
 export async function clearResumes() {
   return new Promise((resolve, reject) => {
     const store = getStore(STORE_RESUMES, 'readwrite');
+    const request = store.clear();
+    request.onsuccess = () => resolve();
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+// ===== JOB APPLICATIONS =====
+
+export async function getAllApplications() {
+  return new Promise((resolve, reject) => {
+    const store = getStore(STORE_APPLICATIONS);
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+export async function addApplication(app) {
+  return new Promise((resolve, reject) => {
+    const store = getStore(STORE_APPLICATIONS, 'readwrite');
+    const now = new Date().toISOString();
+    const request = store.add({ ...app, createdAt: now, updatedAt: now });
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+export async function updateApplication(id, app) {
+  return new Promise((resolve, reject) => {
+    const store = getStore(STORE_APPLICATIONS, 'readwrite');
+    const updated = { ...app, id, updatedAt: new Date().toISOString() };
+    const request = store.put(updated);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+export async function deleteApplication(id) {
+  return new Promise((resolve, reject) => {
+    const store = getStore(STORE_APPLICATIONS, 'readwrite');
+    const request = store.delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+export async function clearApplications() {
+  return new Promise((resolve, reject) => {
+    const store = getStore(STORE_APPLICATIONS, 'readwrite');
     const request = store.clear();
     request.onsuccess = () => resolve();
     request.onerror = (e) => reject(e.target.error);
