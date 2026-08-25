@@ -1,7 +1,7 @@
 # ResumeIt v1.2.0 📝
 
 > **AI-Driven Resume Generator for Software Engineers**  
-> Open Source · Privacy-First · Zero Backend
+> Open Source · Privacy-First · No Backend
 
 [![Deploy to GitHub Pages](https://github.com/deeyeti/resumeit/actions/workflows/deploy.yml/badge.svg)](https://github.com/deeyeti/resumeit/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-6c63ff.svg)](LICENSE)
