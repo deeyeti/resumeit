@@ -801,6 +801,13 @@
               <p style="margin:8px 0 0;color:var(--text-muted);">&#10003; Free tier: 1,500 requests/day &middot; No credit card needed &middot; Rotating or deleting the key in AI Studio immediately revokes access.</p>
             </div>
           </div>
+          <div class="form-group">
+            <label class="form-label">Gemini Model</label>
+            <select id="set-model" class="form-input">
+              <!-- Options populated dynamically by renderSettings() -->
+            </select>
+            <p class="form-hint">Choose which Gemini model powers resume generation. Flash is recommended for speed; Pro for quality.</p>
+          </div>
         </div>
 
         <button class="btn btn-primary" onclick="saveSettingsForm()" id="save-settings-btn" style="margin-bottom:40px;">

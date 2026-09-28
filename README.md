@@ -1,4 +1,4 @@
-# ResumeIt v1.2.0 📝
+# ResumeIt v1.3.0 📝
 
 > **AI-Driven Resume Generator for Software Engineers**  
 > Open Source · Privacy-First · Zero Backend
@@ -44,6 +44,7 @@ ResumeIt is a **client-side, AI-powered resume generator** built specifically fo
 | 📂 **Resume Library** | Save and re-download past resumes |
 | 📥 **Resume & JD Upload** | Upload PDF/DOCX for your existing resume or job description — AI extracts context automatically |
 | ✉️ **AI Cover Letter** | Generate a tailored cover letter with tone options, hiring manager field, inline preview, copy & download |
+| 🤖 **Model Selector** | Choose your Gemini model — 2.5 Flash (default), 2.5 Pro, 2.0 Flash, or 2.0 Flash-Lite |
 | 🔒 **Zero-Tracking** | API keys and data stored only in browser localStorage/IndexedDB |
 
 ### Resume customisation and templates
@@ -61,6 +62,8 @@ These choices are used in the AI prompt, applied to the live preview and PDF exp
 Version 1.1 added a **Templates** workspace where you can select a global default design, change its accent color and font pairing, and preview all six layouts with sample resume data. At the generator preview step, templates switch instantly without another Gemini request.
 
 Version 1.2 adds **AI Cover Letter generation** and **file upload** support for both job descriptions and existing resumes, along with a significantly enhanced ATS-maximization prompt engine.
+
+Version 1.3 upgrades the default model from `gemini-2.0-flash` to **`gemini-2.5-flash`** and adds a **model selector** in Settings → API Configuration, letting you pick the Gemini model that best fits your needs.
 
 The Compact template uses a two-column presentation to fit dense technical profiles. It includes an in-app ATS caution because older applicant tracking systems may read columns less reliably.
 
@@ -122,7 +125,7 @@ Click the copy icon next to your key. Keep this key private — treat it like a 
 
 ### Is it really free?
 
-Yes. Google's Gemini free tier (`gemini-2.0-flash`) provides:
+Yes. Google's Gemini free tier (`gemini-2.5-flash`) provides:
 - **1,500 requests/day**
 - **1 million tokens/minute**
 
@@ -209,8 +212,8 @@ This project uses **semantic versioning** (`MAJOR.MINOR.PATCH`).
 
 To create a new release:
 ```bash
-git tag v1.2.0
-git push origin v1.2.0
+git tag v1.3.0
+git push origin v1.3.0
 # GitHub Actions will automatically create a GitHub Release with changelog
 ```
 

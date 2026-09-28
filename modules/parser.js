@@ -4,6 +4,8 @@
  * Runs entirely client-side - no server upload.
  */
 
+import { getModel } from './llm.js';
+
 /**
  * Extract text from a PDF file using pdf.js
  */
@@ -115,7 +117,7 @@ Resume Text:
 ${resumeText.substring(0, 8000)}`;
 
   // Use raw Gemini call
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${getModel()}:generateContent?key=${apiKey}`;
   const body = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: { temperature: 0.2, maxOutputTokens: 3000, responseMimeType: 'application/json' },

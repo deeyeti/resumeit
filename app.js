@@ -5,7 +5,7 @@
 
 import { initDB, getAllVaultEntries, addVaultEntry, updateVaultEntry, deleteVaultEntry, clearVault, saveResume, getAllResumes, deleteResume, clearResumes, getAllApplications, addApplication, updateApplication, deleteApplication, clearApplications } from './modules/vault.js';
 import { fetchGitHubProfile, validateGitHubUser } from './modules/github.js';
-import { rankVaultEntries, generateResume, validateApiKey, improveResumeBullet, generateCoverLetter, scoreFitForJD } from './modules/llm.js';
+import { rankVaultEntries, generateResume, validateApiKey, improveResumeBullet, generateCoverLetter, scoreFitForJD, AVAILABLE_MODELS, getModel, setModel } from './modules/llm.js';
 import { parseResume, extractVaultEntriesFromText } from './modules/parser.js';
 import { renderResumePreview, renderTemplateThumbnail, exportToPDF, getResumeFilename } from './modules/exporter.js';
 import { TEMPLATES, COLOR_THEMES, FONT_PAIRINGS, SAMPLE_RESUME } from './modules/templates/index.js';
@@ -36,6 +36,8 @@ const ls = {
 };
 
 function getSettings() {
+  const model = ls.get('model', 'gemini-2.5-flash');
+  setModel(model); // sync the llm module with the persisted choice
   return {
     apiKey: ls.get('api_key', ''),
     github: ls.get('github', ''),
@@ -43,6 +45,7 @@ function getSettings() {
     email: ls.get('email', ''),
     linkedin: ls.get('linkedin', ''),
     location: ls.get('location', ''),
+    model,
     onboarded: ls.get('onboarded', false),
   };
 }
@@ -1782,9 +1785,18 @@ function renderSettings() {
   document.getElementById('set-linkedin').value = s.linkedin || '';
   document.getElementById('set-location').value = s.location || '';
   document.getElementById('set-api-key').value = s.apiKey || '';
+
+  // Populate model selector
+  const modelSelect = document.getElementById('set-model');
+  if (modelSelect) {
+    modelSelect.innerHTML = AVAILABLE_MODELS.map(m =>
+      `<option value="${m.id}" ${m.id === s.model ? 'selected' : ''}>${m.label} — ${m.desc}</option>`
+    ).join('');
+  }
 }
 
 async function saveSettingsForm() {
+  const selectedModel = document.getElementById('set-model')?.value || 'gemini-2.5-flash';
   const settings = {
     name: document.getElementById('set-name').value.trim(),
     email: document.getElementById('set-email').value.trim(),
@@ -1792,9 +1804,11 @@ async function saveSettingsForm() {
     linkedin: document.getElementById('set-linkedin').value.trim(),
     location: document.getElementById('set-location').value.trim(),
     api_key: document.getElementById('set-api-key').value.trim(),
+    model: selectedModel,
   };
 
   saveSettings(settings);
+  setModel(selectedModel);
   state.settings = getSettings();
   showToast('Settings saved!', 'success');
 }
