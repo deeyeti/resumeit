@@ -139,6 +139,7 @@ function navigate(page) {
   if (navEl) navEl.classList.add('active');
 
   state.currentPage = page;
+  ls.set('last_page', page);
 
   const titles = {
     dashboard: 'Dashboard',
@@ -2229,7 +2230,20 @@ Object.assign(window, {
   if (!settings.onboarded) {
     showOnboarding();
   } else {
-    navigate('dashboard');
+    // Restore last page the user was on, or default to dashboard
+    const lastPage = ls.get('last_page', 'dashboard');
+    const validPages = ['dashboard', 'vault', 'generate', 'resumes', 'templates', 'settings', 'tracker'];
+    navigate(validPages.includes(lastPage) ? lastPage : 'dashboard');
+
+    // Welcome back greeting
+    const lastActive = ls.get('last_active', null);
+    if (lastActive) {
+      const mins = Math.round((Date.now() - lastActive) / 60000);
+      if (mins > 5) {
+        showToast(`Welcome back, ${settings.name || 'there'}! 👋`, 'info');
+      }
+    }
+    ls.set('last_active', Date.now());
   }
 
   // Wire up onboarding nav buttons
