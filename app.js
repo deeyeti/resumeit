@@ -3,9 +3,9 @@
  * Handles routing, state, UI rendering, and orchestration of all modules.
  */
 
-import { initDB, getAllVaultEntries, addVaultEntry, updateVaultEntry, deleteVaultEntry, clearVault, saveResume, getAllResumes, deleteResume, clearResumes } from './modules/vault.js';
+import { initDB, getAllVaultEntries, addVaultEntry, updateVaultEntry, deleteVaultEntry, clearVault, saveResume, getAllResumes, deleteResume, clearResumes, getAllApplications, addApplication, updateApplication, deleteApplication, clearApplications } from './modules/vault.js';
 import { fetchGitHubProfile, validateGitHubUser } from './modules/github.js';
-import { rankVaultEntries, generateResume, validateApiKey, improveResumeBullet, generateCoverLetter, scoreFitForJD } from './modules/llm.js';
+import { rankVaultEntries, generateResume, validateApiKey, improveResumeBullet, generateCoverLetter, scoreFitForJD, AVAILABLE_MODELS, getModel, setModel } from './modules/llm.js';
 import { parseResume, extractVaultEntriesFromText } from './modules/parser.js';
 import { renderResumePreview, renderTemplateThumbnail, exportToPDF, getResumeFilename } from './modules/exporter.js';
 import { TEMPLATES, COLOR_THEMES, FONT_PAIRINGS, SAMPLE_RESUME } from './modules/templates/index.js';
@@ -15,6 +15,7 @@ const state = {
   currentPage: 'dashboard',
   vaultEntries: [],
   savedResumes: [],
+  applications: [],
   githubData: null,
   currentResume: null,
   generatorStep: 0,
@@ -35,6 +36,8 @@ const ls = {
 };
 
 function getSettings() {
+  const model = ls.get('model', 'gemini-2.5-flash');
+  setModel(model); // sync the llm module with the persisted choice
   return {
     apiKey: ls.get('api_key', ''),
     github: ls.get('github', ''),
@@ -42,6 +45,7 @@ function getSettings() {
     email: ls.get('email', ''),
     linkedin: ls.get('linkedin', ''),
     location: ls.get('location', ''),
+    model,
     onboarded: ls.get('onboarded', false),
   };
 }
@@ -143,6 +147,7 @@ function navigate(page) {
     resumes: 'Saved Resumes',
     templates: 'Templates',
     settings: 'Settings',
+    tracker: 'Applications',
   };
 
   const nameEl = document.getElementById('topbar-page-name');
@@ -154,6 +159,7 @@ function navigate(page) {
   if (page === 'templates') renderTemplateBrowser();
   if (page === 'settings') renderSettings();
   if (page === 'generate') initGenerator();
+  if (page === 'tracker') renderTracker();
 
   const generatorSubnav = document.getElementById('generator-subnav');
   if (generatorSubnav) generatorSubnav.classList.toggle('d-none', page !== 'generate');
@@ -270,6 +276,7 @@ async function refreshData() {
   state.settings = getSettings();
   state.vaultEntries = await getAllVaultEntries();
   state.savedResumes = await getAllResumes();
+  state.applications = await getAllApplications();
   state.templateSelection = getTemplateSelection();
   updateNavBadges();
 }
@@ -277,6 +284,12 @@ async function refreshData() {
 function updateNavBadges() {
   const vaultBadge = document.getElementById('vault-badge');
   if (vaultBadge) vaultBadge.textContent = state.vaultEntries.length;
+  const trackerBadge = document.getElementById('tracker-badge');
+  if (trackerBadge) {
+    const activeCount = state.applications.filter(a => a.status !== 'rejected' && a.status !== 'withdrawn').length;
+    trackerBadge.textContent = state.applications.length;
+    trackerBadge.style.display = state.applications.length ? '' : 'none';
+  }
 }
 
 // ===== DASHBOARD =====
@@ -362,9 +375,11 @@ async function renderDashboard() {
   const settings = getSettings();
   const vaultCount = state.vaultEntries.length;
   const resumeCount = state.savedResumes.length;
+  const appCount = state.applications.length;
 
   animateStat('stat-vault', vaultCount);
   animateStat('stat-resumes', resumeCount);
+  animateStat('stat-applications', appCount);
   document.getElementById('stat-github').textContent = settings.github || '—';
   renderProfileIdentity(settings);
   renderActivityTimeline();
@@ -392,12 +407,38 @@ async function renderDashboard() {
       </div>`).join('');
   }
 
+  // Recent applications
+  const recentAppsEl = document.getElementById('dash-recent-applications');
+  if (recentAppsEl) {
+    if (state.applications.length === 0) {
+      recentAppsEl.innerHTML = `<div class="empty-state" style="padding:20px 0;">
+        <div class="empty-state-title">No applications tracked yet</div>
+        <p class="empty-state-desc">Generate a resume or add one manually to start tracking.</p>
+        <button class="btn btn-outline btn-sm" onclick="openTrackerModal()" style="margin-top:10px;">+ Add application</button>
+      </div>`;
+    } else {
+      const recent = [...state.applications].reverse().slice(0, 3);
+      recentAppsEl.innerHTML = recent.map(a => `
+        <div class="resume-row" onclick="navigate('tracker')" style="cursor:pointer;">
+          <div class="resume-row-icon" style="font-size:1.1rem;">${getStatusEmoji(a.status)}</div>
+          <div class="resume-row-info">
+            <div class="resume-row-title">${escHtml(a.roleTitle)} <span style="color:var(--text-muted);font-weight:400;">at</span> ${escHtml(a.companyName)}</div>
+            <div class="resume-row-meta">${formatDate(a.createdAt)}</div>
+          </div>
+          <div class="resume-row-actions">
+            <span class="status-pill status-${a.status}">${getStatusLabel(a.status)}</span>
+          </div>
+        </div>`).join('');
+    }
+  }
+
   const tipEl = document.getElementById('vault-tip');
   if (tipEl) {
     if (vaultCount === 0) tipEl.classList.remove('d-none');
     else tipEl.classList.add('d-none');
   }
 }
+
 
 // ===== MEMORY VAULT =====
 function renderVault() {
@@ -1245,6 +1286,30 @@ async function startGeneration() {
     setGenerationStatus('🎉', 'Resume generated successfully!', 'ok');
     addActivity('resume_generated', `Generated a ${preferences.pageCount}-page resume`);
 
+    // Auto-track the application
+    try {
+      const resume = generatorState.generatedResume;
+      const roleTitle = resume?.tagline || resume?.name || 'Software Engineer';
+      // Try to extract company name from JD (first line often contains it)
+      const jdFirstLine = jd.split('\n').find(l => l.trim().length > 2)?.trim() || '';
+      const companyName = jdFirstLine.length < 60 ? jdFirstLine : '';
+      const newApp = {
+        roleTitle,
+        companyName: companyName || 'Unknown Company',
+        status: 'applied',
+        jdLink: '',
+        notes: '',
+        appliedDate: new Date().toISOString().split('T')[0],
+        jdSnippet: jd.slice(0, 200),
+        resumeId: null,
+        autoAdded: true,
+      };
+      const newId = await addApplication(newApp);
+      state.applications = await getAllApplications();
+      updateNavBadges();
+      showToast('📋 Application tracked automatically', 'success', 4000);
+    } catch (_) { /* non-critical */ }
+
     showGeneratorStep(4);
     renderResumeResult(generatorState.generatedResume);
 
@@ -1253,6 +1318,7 @@ async function startGeneration() {
     showGeneratorStep(0);
   }
 }
+
 
 function renderGitHubStats(data) {
   const container = document.getElementById('github-stats-panel');
@@ -1719,9 +1785,18 @@ function renderSettings() {
   document.getElementById('set-linkedin').value = s.linkedin || '';
   document.getElementById('set-location').value = s.location || '';
   document.getElementById('set-api-key').value = s.apiKey || '';
+
+  // Populate model selector
+  const modelSelect = document.getElementById('set-model');
+  if (modelSelect) {
+    modelSelect.innerHTML = AVAILABLE_MODELS.map(m =>
+      `<option value="${m.id}" ${m.id === s.model ? 'selected' : ''}>${m.label} — ${m.desc}</option>`
+    ).join('');
+  }
 }
 
 async function saveSettingsForm() {
+  const selectedModel = document.getElementById('set-model')?.value || 'gemini-2.5-flash';
   const settings = {
     name: document.getElementById('set-name').value.trim(),
     email: document.getElementById('set-email').value.trim(),
@@ -1729,9 +1804,11 @@ async function saveSettingsForm() {
     linkedin: document.getElementById('set-linkedin').value.trim(),
     location: document.getElementById('set-location').value.trim(),
     api_key: document.getElementById('set-api-key').value.trim(),
+    model: selectedModel,
   };
 
   saveSettings(settings);
+  setModel(selectedModel);
   state.settings = getSettings();
   showToast('Settings saved!', 'success');
 }
@@ -1758,10 +1835,11 @@ async function validateApiKeyFromSettings() {
 function clearAllData() {
   showConfirm(
     '⚠️ Clear All Data',
-    'This will permanently delete ALL your Memory Vault entries, saved resumes, and settings. This cannot be undone.',
+    'This will permanently delete ALL your Memory Vault entries, saved resumes, applications, and settings. This cannot be undone.',
     async () => {
       await clearVault();
       await clearResumes();
+      await clearApplications();
       localStorage.clear();
       showToast('All data cleared. Reloading...', 'info');
       setTimeout(() => location.reload(), 1500);
@@ -1878,6 +1956,215 @@ function toggleMobileSidebar() {
   if (button) button.setAttribute('aria-expanded', String(opened));
 }
 
+// ===== APPLICATION TRACKER =====
+
+const APP_STATUSES = ['to_apply', 'applied', 'waiting', 'interview', 'offer', 'rejected', 'withdrawn'];
+
+const STATUS_META = {
+  to_apply:  { label: 'To Apply',   emoji: '📌', cls: 'status-to_apply' },
+  applied:   { label: 'Applied',    emoji: '✉️',  cls: 'status-applied' },
+  waiting:   { label: 'Waiting',    emoji: '⏳',  cls: 'status-waiting' },
+  interview: { label: 'Interview',  emoji: '🎙️', cls: 'status-interview' },
+  offer:     { label: 'Offer',      emoji: '🎉',  cls: 'status-offer' },
+  rejected:  { label: 'Rejected',   emoji: '✕',  cls: 'status-rejected' },
+  withdrawn: { label: 'Withdrawn',  emoji: '—',  cls: 'status-withdrawn' },
+};
+
+function getStatusLabel(status) { return STATUS_META[status]?.label || status; }
+function getStatusEmoji(status) { return STATUS_META[status]?.emoji || '•'; }
+
+let trackerFilter = 'all';
+let trackerModalEntryId = null;
+
+function setTrackerFilter(filter) {
+  trackerFilter = filter;
+  document.querySelectorAll('.tracker-filter').forEach(btn => {
+    const active = btn.dataset.filter === filter;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', String(active));
+  });
+  renderTrackerList();
+}
+
+function renderTrackerStatsStrip() {
+  const el = document.getElementById('tracker-stats-strip');
+  if (!el) return;
+  const counts = {};
+  APP_STATUSES.forEach(s => counts[s] = 0);
+  state.applications.forEach(a => { if (counts[a.status] !== undefined) counts[a.status]++; });
+  el.innerHTML = APP_STATUSES.filter(s => counts[s] > 0).map(s => `
+    <div class="tracker-stat-chip tracker-stat-chip--${s}" onclick="setTrackerFilter('${s}')">
+      <span>${STATUS_META[s].emoji}</span>
+      <span>${counts[s]}</span>
+      <span class="tracker-stat-label">${STATUS_META[s].label}</span>
+    </div>
+  `).join('');
+}
+
+function renderTrackerList() {
+  const container = document.getElementById('tracker-list');
+  if (!container) return;
+
+  const filtered = trackerFilter === 'all'
+    ? state.applications
+    : state.applications.filter(a => a.status === trackerFilter);
+
+  const sorted = [...filtered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  if (state.applications.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding:48px 0;">
+        <div style="font-size:2.5rem;margin-bottom:12px;">📋</div>
+        <div class="empty-state-title">No applications tracked yet</div>
+        <p class="empty-state-desc">Applications are automatically added when you generate a resume.<br>You can also add them manually.</p>
+        <button class="btn btn-primary" onclick="openTrackerModal()" style="margin-top:16px;">+ Add application</button>
+      </div>`;
+    return;
+  }
+
+  if (sorted.length === 0) {
+    container.innerHTML = `<div class="empty-state" style="padding:32px 0;"><p class="empty-state-desc">No applications with this status.</p></div>`;
+    return;
+  }
+
+  container.innerHTML = sorted.map(a => `
+    <div class="app-card" id="app-card-${a.id}">
+      <div class="app-card-left">
+        <div class="app-card-company">${escHtml(a.companyName)}</div>
+        <div class="app-card-role">${escHtml(a.roleTitle)}</div>
+        <div class="app-card-meta">
+          ${a.appliedDate ? `<span>Applied ${formatDate(a.appliedDate)}</span>` : `<span>Added ${formatDate(a.createdAt)}</span>`}
+          ${a.autoAdded ? '<span class="app-card-auto-badge">auto-tracked</span>' : ''}
+          ${a.jdLink ? `<a href="${escHtml(a.jdLink)}" target="_blank" rel="noopener" class="app-card-link" onclick="event.stopPropagation()">View JD ↗</a>` : ''}
+        </div>
+        ${a.notes ? `<div class="app-card-notes">${escHtml(a.notes)}</div>` : ''}
+      </div>
+      <div class="app-card-right">
+        <select class="status-selector" onchange="updateApplicationStatus(${a.id}, this.value)" aria-label="Update status">
+          ${APP_STATUSES.map(s => `<option value="${s}" ${a.status === s ? 'selected' : ''}>${STATUS_META[s].emoji} ${STATUS_META[s].label}</option>`).join('')}
+        </select>
+        <div class="app-card-actions">
+          <button class="btn-text" style="font-size:var(--text-xs);" onclick="openTrackerModal(${a.id})">Edit</button>
+          <button class="btn-danger-text" style="font-size:var(--text-xs);" onclick="confirmDeleteApplication(${a.id})">Delete</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderTracker() {
+  renderTrackerStatsStrip();
+  renderTrackerList();
+}
+
+function openTrackerModal(entryId = null) {
+  trackerModalEntryId = entryId;
+  const modal = document.getElementById('tracker-modal');
+  const titleEl = document.getElementById('tracker-modal-title');
+
+  // Reset
+  document.getElementById('tm-role').value = '';
+  document.getElementById('tm-company').value = '';
+  document.getElementById('tm-status').value = 'applied';
+  document.getElementById('tm-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('tm-link').value = '';
+  document.getElementById('tm-notes').value = '';
+
+  if (entryId) {
+    titleEl.textContent = 'Edit application';
+    const entry = state.applications.find(a => a.id === entryId);
+    if (entry) {
+      document.getElementById('tm-role').value = entry.roleTitle || '';
+      document.getElementById('tm-company').value = entry.companyName || '';
+      document.getElementById('tm-status').value = entry.status || 'applied';
+      document.getElementById('tm-date').value = entry.appliedDate || '';
+      document.getElementById('tm-link').value = entry.jdLink || '';
+      document.getElementById('tm-notes').value = entry.notes || '';
+    }
+  } else {
+    titleEl.textContent = 'Add application';
+  }
+
+  modal.classList.add('open');
+  setTimeout(() => document.getElementById('tm-role').focus(), 100);
+}
+
+function closeTrackerModal() {
+  document.getElementById('tracker-modal').classList.remove('open');
+  trackerModalEntryId = null;
+}
+
+async function saveTrackerEntry() {
+  const roleTitle = document.getElementById('tm-role').value.trim();
+  const companyName = document.getElementById('tm-company').value.trim();
+
+  if (!roleTitle) { showToast('Please enter a role title', 'error'); return; }
+  if (!companyName) { showToast('Please enter a company name', 'error'); return; }
+
+  const appData = {
+    roleTitle,
+    companyName,
+    status: document.getElementById('tm-status').value,
+    appliedDate: document.getElementById('tm-date').value,
+    jdLink: document.getElementById('tm-link').value.trim(),
+    notes: document.getElementById('tm-notes').value.trim(),
+    jdSnippet: '',
+    resumeId: null,
+    autoAdded: false,
+  };
+
+  try {
+    if (trackerModalEntryId) {
+      await updateApplication(trackerModalEntryId, appData);
+      showToast('Application updated!', 'success');
+    } else {
+      await addApplication(appData);
+      showToast('Application added!', 'success');
+    }
+    state.applications = await getAllApplications();
+    updateNavBadges();
+    closeTrackerModal();
+    renderTracker();
+    if (state.currentPage === 'dashboard') renderDashboard();
+  } catch (e) {
+    showToast('Failed to save: ' + e.message, 'error');
+  }
+}
+
+async function updateApplicationStatus(id, newStatus) {
+  const app = state.applications.find(a => a.id === id);
+  if (!app) return;
+  try {
+    await updateApplication(id, { ...app, status: newStatus });
+    state.applications = await getAllApplications();
+    updateNavBadges();
+    renderTrackerStatsStrip();
+    // Update just the card's select to reflect saved state
+    const select = document.querySelector(`#app-card-${id} .status-selector`);
+    if (select) select.value = newStatus;
+    showToast(`Status updated to ${getStatusLabel(newStatus)}`, 'success', 2000);
+    if (state.currentPage === 'dashboard') renderDashboard();
+  } catch (e) {
+    showToast('Failed to update status', 'error');
+  }
+}
+
+async function confirmDeleteApplication(id) {
+  const app = state.applications.find(a => a.id === id);
+  showConfirm(
+    '🗑️ Delete Application',
+    `Remove "${app?.roleTitle || 'this application'}" at ${app?.companyName || ''}? This cannot be undone.`,
+    async () => {
+      await deleteApplication(id);
+      state.applications = await getAllApplications();
+      updateNavBadges();
+      renderTracker();
+      showToast('Application removed', 'info');
+      if (state.currentPage === 'dashboard') renderDashboard();
+    }
+  );
+}
+
 // ===== GLOBAL EXPOSURE (for onclick handlers) =====
 Object.assign(window, {
   navigate,
@@ -1922,6 +2209,12 @@ Object.assign(window, {
   generateCoverLetterUI,
   copyCoverLetter,
   downloadCoverLetter,
+  openTrackerModal,
+  closeTrackerModal,
+  saveTrackerEntry,
+  updateApplicationStatus,
+  confirmDeleteApplication,
+  setTrackerFilter,
 });
 
 // ===== INIT =====

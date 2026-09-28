@@ -6,7 +6,25 @@
  */
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-const MODEL = 'gemini-2.0-flash';
+const DEFAULT_MODEL = 'gemini-2.5-flash';
+
+/** Available Gemini models the user can choose from. */
+export const AVAILABLE_MODELS = [
+  { id: 'gemini-2.5-flash',   label: 'Gemini 2.5 Flash',        desc: 'Fast & capable (default)' },
+  { id: 'gemini-2.5-pro',     label: 'Gemini 2.5 Pro',          desc: 'Most capable, slower' },
+  { id: 'gemini-2.0-flash',   label: 'Gemini 2.0 Flash',        desc: 'Previous gen fast model' },
+  { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash-Lite', desc: 'Lightweight, fastest' },
+];
+
+let _selectedModel = DEFAULT_MODEL;
+
+/** Get the currently selected model id. */
+export function getModel() { return _selectedModel; }
+
+/** Set the active model. Falls back to default if the id is unrecognised. */
+export function setModel(modelId) {
+  _selectedModel = AVAILABLE_MODELS.some(m => m.id === modelId) ? modelId : DEFAULT_MODEL;
+}
 
 function buildRankingPrompt(jobDescription, vaultEntries) {
   return `You are an expert resume strategist. Analyze the following job description and rank each experience entry from the Memory Vault by relevance.
@@ -180,7 +198,7 @@ Return this EXACT JSON structure:
 }
 
 async function callGemini(apiKey, prompt) {
-  const url = `${GEMINI_API_BASE}/models/${MODEL}:generateContent?key=${apiKey}`;
+  const url = `${GEMINI_API_BASE}/models/${_selectedModel}:generateContent?key=${apiKey}`;
 
   const body = {
     contents: [{ parts: [{ text: prompt }] }],

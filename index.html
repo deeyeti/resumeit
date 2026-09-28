@@ -194,6 +194,10 @@
       <button class="nav-item" data-page="templates" id="nav-templates">
         <span class="nav-icon" aria-hidden="true">▧</span><span class="nav-label">Templates</span>
       </button>
+      <button class="nav-item" data-page="tracker" id="nav-tracker">
+        <span class="nav-icon" aria-hidden="true">📋</span><span class="nav-label">Applications</span>
+        <span class="nav-badge" id="tracker-badge">0</span>
+      </button>
 
       <div class="nav-section-label">Account</div>
       <button class="nav-item" data-page="settings" id="nav-settings">
@@ -260,6 +264,10 @@
             <div class="stat-value" id="stat-resumes">0</div>
             <div class="stat-label">Resumes Generated</div>
           </div>
+          <div class="stat-cell" style="cursor:pointer;" onclick="navigate('tracker')">
+            <div class="stat-value" id="stat-applications">0</div>
+            <div class="stat-label">Applications</div>
+          </div>
           <div class="stat-cell">
             <div class="stat-value" id="stat-github" style="font-size:var(--text-xl);padding-top:6px;">—</div>
             <div class="stat-label">GitHub Handle</div>
@@ -309,6 +317,13 @@
           <button class="section-action" onclick="navigate('resumes')">View all</button>
         </div>
         <div id="recent-resumes" class="resume-list"></div>
+
+        <!-- Recent applications -->
+        <div class="section-header mt-32">
+          <span class="section-title">Recent applications</span>
+          <button class="section-action" onclick="navigate('tracker')">View all</button>
+        </div>
+        <div id="dash-recent-applications"></div>
 
         <div class="section-header mt-32">
           <span class="section-title">Recent activity</span>
@@ -786,6 +801,13 @@
               <p style="margin:8px 0 0;color:var(--text-muted);">&#10003; Free tier: 1,500 requests/day &middot; No credit card needed &middot; Rotating or deleting the key in AI Studio immediately revokes access.</p>
             </div>
           </div>
+          <div class="form-group">
+            <label class="form-label">Gemini Model</label>
+            <select id="set-model" class="form-input">
+              <!-- Options populated dynamically by renderSettings() -->
+            </select>
+            <p class="form-hint">Choose which Gemini model powers resume generation. Flash is recommended for speed; Pro for quality.</p>
+          </div>
         </div>
 
         <button class="btn btn-primary" onclick="saveSettingsForm()" id="save-settings-btn" style="margin-bottom:40px;">
@@ -803,6 +825,43 @@
             <button class="btn-danger-text" onclick="clearAllData()" id="clear-all-data-btn">Clear all data</button>
           </div>
         </div>
+
+      </div>
+    </section>
+
+    <!-- ===== APPLICATIONS TRACKER ===== -->
+    <section class="page" id="page-tracker">
+      <div class="page-content">
+
+        <div class="page-header">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+            <div>
+              <h1 class="page-title">Applications</h1>
+              <p class="page-desc">Track every role you're pursuing. Applications are automatically added when you generate a resume.</p>
+            </div>
+            <button class="btn btn-primary" onclick="openTrackerModal()" id="add-application-btn" style="flex-shrink:0;margin-top:8px;">
+              + Add application
+            </button>
+          </div>
+        </div>
+
+        <!-- Status filter tabs -->
+        <div class="tracker-filters" id="tracker-filters" role="tablist" aria-label="Filter by status">
+          <button class="tracker-filter active" data-filter="all" role="tab" aria-selected="true" onclick="setTrackerFilter('all')">All</button>
+          <button class="tracker-filter" data-filter="to_apply" role="tab" aria-selected="false" onclick="setTrackerFilter('to_apply')">📌 To Apply</button>
+          <button class="tracker-filter" data-filter="applied" role="tab" aria-selected="false" onclick="setTrackerFilter('applied')">✉️ Applied</button>
+          <button class="tracker-filter" data-filter="waiting" role="tab" aria-selected="false" onclick="setTrackerFilter('waiting')">⏳ Waiting</button>
+          <button class="tracker-filter" data-filter="interview" role="tab" aria-selected="false" onclick="setTrackerFilter('interview')">🎙️ Interview</button>
+          <button class="tracker-filter" data-filter="offer" role="tab" aria-selected="false" onclick="setTrackerFilter('offer')">🎉 Offer</button>
+          <button class="tracker-filter" data-filter="rejected" role="tab" aria-selected="false" onclick="setTrackerFilter('rejected')">✕ Rejected</button>
+          <button class="tracker-filter" data-filter="withdrawn" role="tab" aria-selected="false" onclick="setTrackerFilter('withdrawn')">— Withdrawn</button>
+        </div>
+
+        <!-- Stats strip -->
+        <div class="tracker-stats-strip" id="tracker-stats-strip"></div>
+
+        <!-- Application list -->
+        <div id="tracker-list" class="tracker-list"></div>
 
       </div>
     </section>
@@ -897,6 +956,56 @@
       <span id="template-preview-caution" class="template-caution d-none">Compact uses columns; some older ATS tools may read it less reliably.</span>
       <button class="btn btn-outline" onclick="closeTemplatePreviewModal()">Cancel</button>
       <button class="btn btn-primary" id="template-preview-use-btn" onclick="usePreviewTemplate()">Use this template</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== APPLICATION TRACKER MODAL ===== -->
+<div class="modal-overlay" id="tracker-modal" role="dialog" aria-modal="true" aria-labelledby="tracker-modal-title">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title" id="tracker-modal-title">Add application</div>
+      <button class="modal-close" onclick="closeTrackerModal()" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Role title <span class="form-required">*</span></label>
+          <input id="tm-role" class="form-input" type="text" placeholder="Senior Backend Engineer" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Company <span class="form-required">*</span></label>
+          <input id="tm-company" class="form-input" type="text" placeholder="Acme Corp" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select id="tm-status" class="form-select">
+            <option value="to_apply">📌 To Apply</option>
+            <option value="applied" selected>✉️ Applied</option>
+            <option value="waiting">⏳ Waiting</option>
+            <option value="interview">🎙️ Interview</option>
+            <option value="offer">🎉 Offer</option>
+            <option value="rejected">✕ Rejected</option>
+            <option value="withdrawn">— Withdrawn</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Date applied</label>
+          <input id="tm-date" class="form-input" type="date" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Job posting URL</label>
+        <input id="tm-link" class="form-input" type="url" placeholder="https://company.com/careers/..." />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea id="tm-notes" class="form-textarea" style="min-height:80px;" placeholder="Recruiter name, interview stage, follow-up date…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-text btn-text-muted" onclick="closeTrackerModal()" type="button">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTrackerEntry()" id="tm-save-btn">Save application</button>
     </div>
   </div>
 </div>
